@@ -1,0 +1,47 @@
+{
+  "timezone": "America/New_York",
+  "publishing": [
+    {
+      "time": "09:00",
+      "report": "morning-slate",
+      "label": "Morning Slate",
+      "requirements": [
+        "current slate",
+        "game projections",
+        "pitcher projections",
+        "personal opinions reviewed"
+      ]
+    },
+    {
+      "time": "11:30",
+      "report": "offensive-report",
+      "label": "Offensive Report",
+      "requirements": [
+        "current vs-RHP metrics",
+        "current vs-LHP metrics",
+        "YTD and L7 team profiles"
+      ]
+    },
+    {
+      "time": "15:00",
+      "report": "public-vs-sharp",
+      "label": "Public vs Sharp",
+      "requirements": [
+        "same-day paired odds",
+        "sharp and public book coverage",
+        "market timestamp"
+      ]
+    }
+  ],
+  "refreshes": [
+    {
+      "offset": "90 minutes before first pitch",
+      "action": "Rebuild Morning Slate if a probable pitcher, lineup, projection, or personal opinion changed"
+    },
+    {
+      "offset": "30 minutes before featured game",
+      "action": "Rebuild Public vs Sharp when the market timestamp is older than 30 minutes"
+    }
+  ]
+}
+

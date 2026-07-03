@@ -1,0 +1,193 @@
+{
+  "meta": {
+    "slate_date": "2026-07-03",
+    "generated_at": "2026-07-03T15:15:00+00:00",
+    "run_id": "2026-07-03::sample",
+    "sources": {
+      "pipeline_data": "sample",
+      "model_repo": "sample",
+      "sharp_json": "sample"
+    }
+  },
+  "games": [
+    {
+      "key": "NYY@BOS",
+      "game_pk": 1001,
+      "slate_date": "2026-07-03",
+      "time": "7:10 PM ET",
+      "away": "NYY",
+      "home": "BOS",
+      "away_pitcher": {
+        "name": "Gerrit Cole",
+        "hand": "R",
+        "projected_ip": 5.8,
+        "projected_er": 2.7,
+        "projected_k": 7.1
+      },
+      "home_pitcher": {
+        "name": "Garrett Crochet",
+        "hand": "L",
+        "projected_ip": 6.2,
+        "projected_er": 2.1,
+        "projected_k": 8.0
+      },
+      "projection": {
+        "away_runs": 3.8,
+        "home_runs": 5.2,
+        "away_win_probability": 0.34,
+        "home_win_probability": 0.66,
+        "favorite": "BOS",
+        "favorite_probability": 0.66,
+        "confidence": "medium",
+        "coverage_pct": 82
+      },
+      "opinion": {
+        "tag": "MY BET",
+        "text": "BOS ML -120 · 0.5u",
+        "source": "personal"
+      },
+      "lineup_status": "projected"
+    },
+    {
+      "key": "STL@CHC",
+      "game_pk": 1002,
+      "slate_date": "2026-07-03",
+      "time": "4:05 PM ET",
+      "away": "STL",
+      "home": "CHC",
+      "away_pitcher": {
+        "name": "Andre Pallante",
+        "hand": "R",
+        "projected_ip": 5.3,
+        "projected_er": 3.0,
+        "projected_k": 4.2
+      },
+      "home_pitcher": {
+        "name": "David Peterson",
+        "hand": "L",
+        "projected_ip": 5.7,
+        "projected_er": 2.8,
+        "projected_k": 5.6
+      },
+      "projection": {
+        "away_runs": 4.3,
+        "home_runs": 4.6,
+        "away_win_probability": 0.47,
+        "home_win_probability": 0.53,
+        "favorite": "CHC",
+        "favorite_probability": 0.53,
+        "confidence": "medium",
+        "coverage_pct": 76
+      },
+      "opinion": {
+        "tag": "WATCH",
+        "text": "Waiting for confirmed lineups",
+        "source": "personal"
+      },
+      "lineup_status": "projected"
+    },
+    {
+      "key": "SDP@LAD",
+      "game_pk": 1003,
+      "slate_date": "2026-07-03",
+      "time": "10:10 PM ET",
+      "away": "SDP",
+      "home": "LAD",
+      "away_pitcher": {
+        "name": "Dylan Cease",
+        "hand": "R",
+        "projected_ip": 5.5,
+        "projected_er": 3.2,
+        "projected_k": 6.8
+      },
+      "home_pitcher": {
+        "name": "Yoshinobu Yamamoto",
+        "hand": "R",
+        "projected_ip": 6.0,
+        "projected_er": 2.2,
+        "projected_k": 7.4
+      },
+      "projection": {
+        "away_runs": 3.4,
+        "home_runs": 4.8,
+        "away_win_probability": 0.38,
+        "home_win_probability": 0.62,
+        "favorite": "LAD",
+        "favorite_probability": 0.62,
+        "confidence": "high",
+        "coverage_pct": 91
+      },
+      "opinion": {
+        "tag": "PASS",
+        "text": "Price is too expensive",
+        "source": "personal"
+      },
+      "lineup_status": "confirmed"
+    }
+  ],
+  "offense": {
+    "vs_rhp": [
+      {"team": "LAD", "osi": 83.3},
+      {"team": "PIT", "osi": 70.4},
+      {"team": "CHC", "osi": 64.6},
+      {"team": "NYY", "osi": 63.2},
+      {"team": "ATL", "osi": 61.9}
+    ],
+    "vs_lhp": [
+      {"team": "LAD", "osi": 74.9},
+      {"team": "CHC", "osi": 66.3},
+      {"team": "CHW", "osi": 62.6},
+      {"team": "BOS", "osi": 61.2},
+      {"team": "SEA", "osi": 60.4}
+    ],
+    "risers": [
+      {"team": "BOS", "osi_ytd": 52.0, "osi_l7": 68.5, "delta": 16.5},
+      {"team": "SEA", "osi_ytd": 48.2, "osi_l7": 61.4, "delta": 13.2},
+      {"team": "CLE", "osi_ytd": 45.0, "osi_l7": 56.8, "delta": 11.8}
+    ],
+    "fallers": [
+      {"team": "ATH", "osi_ytd": 47.3, "osi_l7": 33.1, "delta": -14.2},
+      {"team": "ARI", "osi_ytd": 31.3, "osi_l7": 25.4, "delta": -5.9},
+      {"team": "MIA", "osi_ytd": 44.1, "osi_l7": 39.0, "delta": -5.1}
+    ]
+  },
+  "markets": {
+    "pitching": [
+      {
+        "game_pk": 1001,
+        "game": "NYY@BOS",
+        "market": "pitcher_strikeouts",
+        "selection": "Garrett Crochet over 7.5",
+        "sharp_probability": 0.58,
+        "public_probability": 0.49,
+        "divergence": 0.09,
+        "snapshot_time": "2026-07-03T15:00:00+00:00"
+      }
+    ],
+    "ml": [
+      {
+        "game_pk": 1003,
+        "game": "SDP@LAD",
+        "market": "ml",
+        "selection": "LAD",
+        "sharp_probability": 0.62,
+        "public_probability": 0.56,
+        "divergence": 0.06,
+        "snapshot_time": "2026-07-03T15:00:00+00:00"
+      }
+    ],
+    "totals": [
+      {
+        "game_pk": 1002,
+        "game": "STL@CHC",
+        "market": "total",
+        "selection": "Under 9",
+        "sharp_probability": 0.57,
+        "public_probability": 0.51,
+        "divergence": 0.06,
+        "snapshot_time": "2026-07-03T15:00:00+00:00"
+      }
+    ]
+  }
+}
+

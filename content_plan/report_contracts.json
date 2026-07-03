@@ -1,0 +1,36 @@
+{
+  "morning-slate": {
+    "sort": "favorite_probability_desc",
+    "max_graphics": 3,
+    "max_games_per_graphic": 6,
+    "required_fields": [
+      "game key",
+      "start time",
+      "projected score",
+      "win probabilities",
+      "away pitcher IP/ER/K",
+      "home pitcher IP/ER/K",
+      "personal opinion tag"
+    ]
+  },
+  "offensive-report": {
+    "sections": [
+      "top offenses vs RHP",
+      "top offenses vs LHP",
+      "risers",
+      "fallers"
+    ],
+    "rows_per_section": 5
+  },
+  "public-vs-sharp": {
+    "sections": [
+      "pitching",
+      "moneyline",
+      "totals"
+    ],
+    "rows_per_section": 4,
+    "sort": "absolute_divergence_desc",
+    "require_same_day_timestamp": true
+  }
+}
+

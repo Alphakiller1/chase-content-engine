@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chase-content-engine"
+version = "0.1.0"
+description = "Verified Chase Analytics data migration and social graphic generation."
+requires-python = ">=3.11"
+dependencies = ["Pillow>=10.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.scripts]
+chase-content = "chase_content.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["chase_content*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
