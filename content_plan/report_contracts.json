@@ -1,16 +1,30 @@
 {
+  "_contract_version": "1.0.0",
+  "_governed_by": "design/CONTENT_DESIGN_CONTRACT.md",
   "morning-slate": {
-    "sort": "favorite_probability_desc",
+    "sort": "model_run_separation_desc",
     "max_graphics": 3,
-    "max_games_per_graphic": 6,
+    "cards_per_graphic_standard": 4,
+    "cards_per_graphic_compact": 5,
+    "card_height_px": [190, 220],
     "required_fields": [
       "game key",
       "start time",
-      "projected score",
-      "win probabilities",
+      "away team logo + abbreviation",
+      "home team logo + abbreviation",
+      "away projected runs",
+      "home projected runs",
+      "separation label",
       "away pitcher IP/ER/K",
       "home pitcher IP/ER/K",
+      "lineup state",
+      "model confidence",
       "personal opinion tag"
+    ],
+    "prohibited_fields": [
+      "win probability",
+      "win probability bar",
+      "pitcher portrait (default)"
     ]
   },
   "offensive-report": {
@@ -20,7 +34,14 @@
       "risers",
       "fallers"
     ],
-    "rows_per_section": 5
+    "rows_per_section": 5,
+    "required_fields": [
+      "team logo + abbreviation",
+      "OSI (league metricColor)",
+      "recent-window OSI",
+      "signed delta (league metricColor)",
+      "explicit compared window"
+    ]
   },
   "public-vs-sharp": {
     "sections": [
@@ -30,7 +51,16 @@
     ],
     "rows_per_section": 4,
     "sort": "absolute_divergence_desc",
-    "require_same_day_timestamp": true
+    "require_same_day_timestamp": true,
+    "required_fields": [
+      "game or player",
+      "market and line",
+      "public de-vigged probability (neutral identity)",
+      "sharp de-vigged probability (purple identity)",
+      "signed divergence (magnitude, not a bet)",
+      "observation timestamp",
+      "book coverage or confidence when available"
+    ],
+    "language": "observation-only (never play/lock/smart-money)"
   }
 }
-
