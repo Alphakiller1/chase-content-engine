@@ -18,6 +18,9 @@ chase-content = "chase_content.cli:main"
 [tool.setuptools.packages.find]
 include = ["chase_content*"]
 
+[tool.setuptools.package-data]
+chase_content = ["fonts/*.ttf"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

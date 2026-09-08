@@ -62,5 +62,9 @@
       "book coverage or confidence when available"
     ],
     "language": "observation-only (never play/lock/smart-money)"
+  },
+  "featured-matchup": {
+    "status": "dropped",
+    "note": "Not a contracted daily report. Do not render a featured-matchup graphic."
   }
 }

@@ -9,7 +9,7 @@ from pathlib import Path
 from PIL import Image
 
 from chase_content.migrate import load_pipeline, load_sharp
-from chase_content.render import render_reports
+from chase_content.render import format_market_move, format_osi_window, render_reports
 from chase_content.validate import validate_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -126,6 +126,32 @@ class BundleAndRenderTests(unittest.TestCase):
                 self.assertTrue(path.exists())
                 with Image.open(path) as image:
                     self.assertEqual(image.size, (1080, 1350))
+
+    def test_render_reports_validates_bundle(self):
+        self.bundle["games"][0]["projection"]["home_win_probability"] = 0.80
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaises(ValueError):
+                render_reports(self.bundle, Path(temp), "morning-slate")
+
+    def test_missing_osi_and_market_values_are_not_zero(self):
+        self.assertEqual(
+            format_osi_window({"osi_ytd": None, "osi_l7": None}),
+            "YTD — → L7 —",
+        )
+        self.assertEqual(
+            format_market_move({"public_probability": None, "sharp_probability": 0.6}),
+            "observation pending",
+        )
+        self.assertNotIn("0.0%", format_market_move({}))
+        self.assertNotIn("+0.0", format_osi_window({}))
+
+    def test_bundled_fonts_are_dm_sans_and_roboto_condensed(self):
+        from chase_content.render import FONTS, _FONTS_DIR
+
+        self.assertTrue((_FONTS_DIR / "DMSans-Regular.ttf").is_file())
+        self.assertTrue((_FONTS_DIR / "RobotoCondensed-Bold.ttf").is_file())
+        self.assertTrue(FONTS["title"].getname()[0].startswith("Roboto Condensed"))
+        self.assertTrue(FONTS["body"].getname()[0].startswith("DM Sans"))
 
 
 if __name__ == "__main__":
