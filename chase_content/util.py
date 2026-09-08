@@ -3,20 +3,40 @@ from __future__ import annotations
 import csv
 import datetime as dt
 import json
+import math
 from pathlib import Path
 from typing import Any
 
 
 def number(value: Any) -> float | None:
-    if value is None or value == "":
+    if value is None or value == "" or isinstance(value, bool):
         return None
     try:
         result = float(value)
     except (TypeError, ValueError):
         return None
-    if result != result:
+    if not math.isfinite(result):
         return None
     return result
+
+
+def unit_probability(value: Any) -> float | None:
+    parsed = number(value)
+    if parsed is None or parsed < 0 or parsed > 1:
+        return None
+    return parsed
+
+
+def first_present_number(row: dict[str, Any], *keys: str) -> float | None:
+    """Parse the first present alias. Zero is a real observation, not a missing flag."""
+    for key in keys:
+        if key not in row:
+            continue
+        raw = row[key]
+        if raw is None or raw == "":
+            continue
+        return number(raw)
+    return None
 
 
 def integer(value: Any) -> int | None:

@@ -7,6 +7,7 @@ from typing import Any
 
 from chase_content.util import (
     find_file,
+    first_present_number,
     game_key,
     integer,
     number,
@@ -33,7 +34,7 @@ def _top_offenses(rows: list[dict], limit: int = 5) -> list[dict]:
                 "abq": number(row.get("ABQ") if "ABQ" in row else row.get("abq")),
                 "rcv": number(row.get("RCV") if "RCV" in row else row.get("rcv")),
                 "obr": number(row.get("OBR") if "OBR" in row else row.get("obr")),
-                "wrc_plus": number(row.get("wRC+") or row.get("wrc_plus")),
+                "wrc_plus": first_present_number(row, "wRC+", "wrc_plus"),
             }
         )
     return sorted(ranked, key=lambda row: row["osi"], reverse=True)[:limit]
@@ -199,8 +200,8 @@ def load_sharp(path: Path | None, slate_date: str | None) -> dict[str, list[dict
         observed_date = parse_iso_date(timestamp)
         if slate_date and observed_date and observed_date != slate_date:
             continue
-        sharp = number(row.get("sharp_probability") or row.get("sharp_novig_prob"))
-        public = number(row.get("public_probability") or row.get("soft_novig_prob"))
+        sharp = first_present_number(row, "sharp_probability", "sharp_novig_prob")
+        public = first_present_number(row, "public_probability", "soft_novig_prob")
         if sharp is None or public is None:
             continue
         result[category].append(
