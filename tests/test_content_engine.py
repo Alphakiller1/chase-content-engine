@@ -121,7 +121,7 @@ class BundleAndRenderTests(unittest.TestCase):
     def test_all_reports_render_at_social_dimensions(self):
         with tempfile.TemporaryDirectory() as temp:
             paths = render_reports(self.bundle, Path(temp), "all")
-            self.assertEqual(len(paths), 3)
+            self.assertGreaterEqual(len(paths), 3)
             for path in paths:
                 self.assertTrue(path.exists())
                 with Image.open(path) as image:

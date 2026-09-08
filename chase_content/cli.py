@@ -11,7 +11,7 @@ from chase_content.render import render_reports
 from chase_content.util import read_json, write_json
 from chase_content.validate import validate_bundle
 
-REPORTS = ("all", "morning-slate", "offensive-report", "public-vs-sharp")
+REPORTS = ("all", "morning-slate", "offensive-report", "public-vs-sharp", "featured-matchup")
 
 
 def _path(value: str | None) -> Path | None:

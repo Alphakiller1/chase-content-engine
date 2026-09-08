@@ -19,6 +19,25 @@ from chase_content.util import (
 ALLOWED_OPINION_TAGS = {"MY BET", "LEAN", "WATCH", "PASS", "NO OPINION"}
 
 
+def _norm_name(value: Any) -> str:
+    import re
+    import unicodedata
+
+    text = unicodedata.normalize("NFD", str(value or ""))
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    return re.sub(r"[^a-z0-9 ]", "", text.lower()).strip()
+
+
+def _pitcher_id_index(registry_path: Path) -> dict[str, int]:
+    index: dict[str, int] = {}
+    for row in read_csv(registry_path):
+        name = _norm_name(row.get("full_name") or row.get("name"))
+        pid = integer(row.get("player_id") or row.get("mlb_id"))
+        if name and pid is not None:
+            index[name] = pid
+    return index
+
+
 def _top_offenses(rows: list[dict], limit: int = 5) -> list[dict]:
     ranked = []
     for row in rows:
@@ -66,6 +85,9 @@ def load_pipeline(pipeline_data: Path) -> dict:
     profiles = read_csv(find_file(pipeline_data, "team_profiles.csv", "Team_Profiles.csv"))
     risers, fallers = _trajectory(profiles)
 
+    registry_path = find_file(pipeline_data, "player_registry.csv")
+    mlb_ids = _pitcher_id_index(registry_path)
+
     games = []
     for row in matchups:
         away = str(row.get("Away") or "").strip().upper()
@@ -73,6 +95,8 @@ def load_pipeline(pipeline_data: Path) -> dict:
         if not away or not home:
             continue
         slate_date = parse_iso_date(row.get("Slate_Date"))
+        away_sp = str(row.get("Away_SP") or "TBD")
+        home_sp = str(row.get("Home_SP") or "TBD")
         games.append(
             {
                 "key": game_key(away, home),
@@ -81,13 +105,38 @@ def load_pipeline(pipeline_data: Path) -> dict:
                 "time": str(row.get("Time") or "TBD"),
                 "away": away,
                 "home": home,
+                "away_osi": number(row.get("Away_OSI")),
+                "home_osi": number(row.get("Home_OSI")),
+                "lineup_edge": str(row.get("Lineup_Edge") or "").strip(),
+                "away_pitch_score": number(row.get("Away_PitchScore")),
+                "home_pitch_score": number(row.get("Home_PitchScore")),
+                "away_k_pct": number(row.get("Away_K%")),
+                "home_k_pct": number(row.get("Home_K%")),
+                "away_bb_pct": number(row.get("Away_BB%")),
+                "home_bb_pct": number(row.get("Home_BB%")),
+                "away_hr9": number(row.get("Away_HR9")),
+                "home_hr9": number(row.get("Home_HR9")),
+                "away_fip": number(row.get("Away_FIP")),
+                "home_fip": number(row.get("Home_FIP")),
                 "away_pitcher": {
-                    "name": str(row.get("Away_SP") or "TBD"),
+                    "name": away_sp,
                     "hand": str(row.get("Away_Hand") or ""),
+                    "mlb_id": mlb_ids.get(_norm_name(away_sp)),
+                    "pitch_score": number(row.get("Away_PitchScore")),
+                    "k_pct": number(row.get("Away_K%")),
+                    "bb_pct": number(row.get("Away_BB%")),
+                    "hr9": number(row.get("Away_HR9")),
+                    "fip": number(row.get("Away_FIP")),
                 },
                 "home_pitcher": {
-                    "name": str(row.get("Home_SP") or "TBD"),
+                    "name": home_sp,
                     "hand": str(row.get("Home_Hand") or ""),
+                    "mlb_id": mlb_ids.get(_norm_name(home_sp)),
+                    "pitch_score": number(row.get("Home_PitchScore")),
+                    "k_pct": number(row.get("Home_K%")),
+                    "bb_pct": number(row.get("Home_BB%")),
+                    "hr9": number(row.get("Home_HR9")),
+                    "fip": number(row.get("Home_FIP")),
                 },
                 "lineup_status": str(row.get("Lineup_Status") or "projected").lower(),
             }
@@ -338,7 +387,22 @@ def migrate(
     for game in games:
         projection = model.get(game["key"], {})
         if projection:
+            base_away = dict(game.get("away_pitcher") or {})
+            base_home = dict(game.get("home_pitcher") or {})
             game.update(projection)
+            merged_away = dict(base_away)
+            merged_away.update(projection.get("away_pitcher") or {})
+            # Prefer pipeline identity + pitch scores when model omits them.
+            for key in ("mlb_id", "pitch_score", "k_pct", "bb_pct", "hr9", "fip"):
+                if merged_away.get(key) is None and base_away.get(key) is not None:
+                    merged_away[key] = base_away[key]
+            merged_home = dict(base_home)
+            merged_home.update(projection.get("home_pitcher") or {})
+            for key in ("mlb_id", "pitch_score", "k_pct", "bb_pct", "hr9", "fip"):
+                if merged_home.get(key) is None and base_home.get(key) is not None:
+                    merged_home[key] = base_home[key]
+            game["away_pitcher"] = merged_away
+            game["home_pitcher"] = merged_home
         game["opinion"] = opinion_map.get(
             game["key"],
             {"tag": "NO OPINION", "text": "", "source": "personal"},

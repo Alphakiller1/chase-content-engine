@@ -1,0 +1,22 @@
+{
+  "LAD@NYY": {
+    "tag": "WATCH",
+    "text": "Market → NYY (home/pen vs Sasaki). Arms: slight Cole. Lineups: LAD healthier / full strength."
+  },
+  "TBR@BOS": {
+    "tag": "LEAN",
+    "text": "Game 1: Jax vs Bennett. Lean Bennett for consistency. Rays healthier lineup on the road (+20.3 OSI)."
+  },
+  "PIT@CLE": {
+    "tag": "WATCH",
+    "text": "PIT offense elite but unhealthy + soft pen. CLE over .500 with thin talent + better pen. Regression watch."
+  },
+  "TEX@ATL": {
+    "tag": "LEAN",
+    "text": "Sale underrated; Quantrill regression risk. ATL pen still among best when healthy."
+  },
+  "MIA@MIL": {
+    "tag": "LEAN",
+    "text": "Similar young offenses. Henderson stepped up (PS 86.7) vs Alcantara OK — lean Milwaukee arm."
+  }
+}
