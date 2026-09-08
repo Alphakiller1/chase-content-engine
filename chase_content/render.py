@@ -22,7 +22,6 @@ PURPLE_LIGHT = "#C4B0FF"
 GREEN = "#4ADE80"
 RED = "#F87171"
 GOLD = "#FBBF24"
-BLUE = "#60A5FA"
 
 
 _FONTS_DIR = Path(__file__).resolve().parent / "fonts"
@@ -186,36 +185,37 @@ def _updated_label(bundle: dict) -> str:
     return raw.replace("T", " ")[:19] + (" UTC" if raw else "")
 
 
-def _favorite_win_probability(away_p: float | None, home_p: float | None) -> float | None:
-    """Largest observed side. Missing sides stay missing — never 0.5."""
-    observed = [p for p in (away_p, home_p) if p is not None]
-    return max(observed) if observed else None
+def _run_separation(game: dict) -> float | None:
+    """abs(home_runs - away_runs), the contract's sole Morning Slate ranking signal.
 
-
-def _fmt_win_pct(probability: float | None) -> str:
-    return f"{probability * 100:.0f}%" if probability is not None else "—"
+    Contract 5.2. A game missing either side has no separation; it stays None
+    rather than collapsing to 0, which would rank a game with no projection
+    alongside a genuine toss-up.
+    """
+    projection = game.get("projection") or {}
+    away = number(projection.get("away_runs"))
+    home = number(projection.get("home_runs"))
+    if away is None or home is None:
+        return None
+    return abs(home - away)
 
 
 def _model_separation_sort_key(game: dict) -> float:
-    """Rank by observed favorite probability. Games with no probs sort last, not as 0.5."""
-    projection = game.get("projection") or {}
-    favorite = _favorite_win_probability(
-        number(projection.get("away_win_probability")),
-        number(projection.get("home_win_probability")),
-    )
-    return favorite if favorite is not None else float("-inf")
+    """Rank by run separation. Games with no projection sort last."""
+    separation = _run_separation(game)
+    return separation if separation is not None else float("-inf")
 
 
-def _separation(probability: float | None) -> tuple[str, str]:
-    if probability is None:
+def _separation(separation: float | None) -> tuple[str, str]:
+    """Contract 5.5 thresholds. Derived from runs, never from probability."""
+    if separation is None:
         return "PENDING", MUTED
-    pct = probability * 100
-    if pct >= 65:
+    if separation >= 1.5:
         return "LOPSIDED", RED
-    if pct >= 60:
+    if separation >= 1.0:
         return "CLEAR EDGE", GOLD
-    if pct >= 55:
-        return "LEAN", BLUE
+    if separation >= 0.5:
+        return "LEAN", PURPLE_LIGHT
     return "TOSS-UP", MUTED
 
 
@@ -223,7 +223,7 @@ def _opinion_color(tag: str) -> str:
     return {
         "MY BET": GREEN,
         "LEAN": PURPLE,
-        "WATCH": BLUE,
+        "WATCH": GOLD,
         "PASS": MUTED,
         "NO OPINION": MUTED,
     }.get(tag, MUTED)
@@ -257,9 +257,7 @@ def _draw_game_card(
     x1, y1, x2, y2 = box
     draw.rounded_rectangle(box, radius=22, fill=PANEL, outline=BORDER, width=2)
     projection = game.get("projection") or {}
-    away_p = number(projection.get("away_win_probability"))
-    home_p = number(projection.get("home_win_probability"))
-    label, tone = _separation(_favorite_win_probability(away_p, home_p))
+    label, tone = _separation(_run_separation(game))
     away, home = game.get("away", "AWY"), game.get("home", "HME")
 
     draw.text((x1 + 22, y1 + 17), f"#{rank}", font=FONTS["rank"], fill=PURPLE)
@@ -276,32 +274,18 @@ def _draw_game_card(
     draw.text((x1 + 22, y1 + 60), score, font=FONTS["score"], fill=TEXT)
     draw.text((x2 - 22, y1 + 67), label, font=FONTS["small_bold"], fill=tone, anchor="ra")
 
-    bar_x1, bar_x2, bar_y = x1 + 22, x2 - 22, y1 + 109
-    bar_width = bar_x2 - bar_x1
-    draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 13), radius=7, fill="#282C38")
-    if away_p is not None and home_p is not None:
-        split = bar_x1 + int(bar_width * away_p)
-        draw.rounded_rectangle((bar_x1, bar_y, split, bar_y + 13), radius=7, fill=BLUE)
-        draw.rounded_rectangle((split, bar_y, bar_x2, bar_y + 13), radius=7, fill=PURPLE)
-    draw.text(
-        (bar_x1, bar_y + 18),
-        f"{_fmt_win_pct(away_p)} {away}",
-        font=FONTS["tiny"],
-        fill=MUTED,
-    )
-    draw.text(
-        (bar_x2, bar_y + 18),
-        f"{home} {_fmt_win_pct(home_p)}",
-        font=FONTS["tiny"],
-        fill=MUTED,
-        anchor="ra",
-    )
+    # Contract 5.5: no win-probability bar, no percentages, and no second
+    # display of the game projection. RUN PROJECTION above is the only one.
+    # The removed bar occupied this band; the anchor is kept so card geometry
+    # and the 190-220px height budget are unchanged. Section 5.3 still wants
+    # lineup state and model confidence here - that is a design pass, not this fix.
+    content_y = y1 + 109
 
     opinion = game.get("opinion") or {}
     tag = str(opinion.get("tag") or "NO OPINION").upper()
     opinion_text = truncate(opinion.get("text"), 43)
     if compact:
-        pitcher_y = bar_y + 35
+        pitcher_y = content_y + 35
         midpoint = (x1 + x2) // 2
         draw.text(
             (x1 + 22, pitcher_y),
@@ -317,7 +301,7 @@ def _draw_game_card(
         )
         opinion_y = y2 - 29
     else:
-        pitcher_y = bar_y + 47
+        pitcher_y = content_y + 47
         draw.text(
             (x1 + 22, pitcher_y),
             _pitcher_text(game.get("away_pitcher") or {}),
