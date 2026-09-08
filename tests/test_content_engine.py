@@ -13,9 +13,12 @@ from PIL import Image
 from chase_content.cli import REPORTS
 from chase_content.migrate import load_pipeline, load_sharp
 from chase_content.render import (
+    FONTS,
     MUTED,
+    _FONTS_DIR,
     _favorite_win_probability,
     _fmt_win_pct,
+    _font,
     _model_separation_sort_key,
     _separation,
     format_market_move,
@@ -142,9 +145,8 @@ class BundleAndRenderTests(unittest.TestCase):
 
     def test_render_reports_validates_bundle(self):
         self.bundle["games"][0]["projection"]["home_win_probability"] = 0.80
-        with tempfile.TemporaryDirectory() as temp:
-            with self.assertRaises(ValueError):
-                render_reports(self.bundle, Path(temp), "morning-slate")
+        with tempfile.TemporaryDirectory() as temp, self.assertRaises(ValueError):
+            render_reports(self.bundle, Path(temp), "morning-slate")
 
     def test_render_reports_invokes_validate_bundle(self):
         with tempfile.TemporaryDirectory() as temp, patch(
@@ -159,9 +161,8 @@ class BundleAndRenderTests(unittest.TestCase):
         self.bundle["games"][0]["projection"].pop("away_win_probability")
         problems = validate_bundle(self.bundle, require_projections=True)
         self.assertTrue(any("win probabilities are missing" in problem for problem in problems))
-        with tempfile.TemporaryDirectory() as temp:
-            with self.assertRaises(ValueError) as raised:
-                render_reports(self.bundle, Path(temp), "morning-slate")
+        with tempfile.TemporaryDirectory() as temp, self.assertRaises(ValueError) as raised:
+            render_reports(self.bundle, Path(temp), "morning-slate")
         self.assertIn("win probabilities are missing", str(raised.exception))
 
     def test_invalid_market_probabilities_fail_closed(self):
@@ -204,8 +205,6 @@ class BundleAndRenderTests(unittest.TestCase):
             self.assertNotIn(needle, source)
 
     def test_bundled_fonts_are_dm_sans_and_roboto_condensed(self):
-        from chase_content.render import FONTS, _FONTS_DIR, _font
-
         for name in (
             "DMSans-Regular.ttf",
             "DMSans-Bold.ttf",
