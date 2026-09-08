@@ -118,17 +118,24 @@ def format_osi_window(row: dict) -> str:
     return f"YTD {_fmt_optional(ytd, '{:.1f}')} → L7 {_fmt_optional(l7, '{:.1f}')}"
 
 
+def market_divergence(row: dict) -> float | None:
+    """Signed public→sharp gap, or None when an observation is missing (never 0.0 / 0.5)."""
+    public_n = number(row.get("public_probability"))
+    sharp_n = number(row.get("sharp_probability"))
+    if public_n is None or sharp_n is None:
+        return None
+    divergence_n = number(row.get("divergence"))
+    return divergence_n if divergence_n is not None else (sharp_n - public_n)
+
+
 def format_market_move(row: dict) -> str:
     """Public→sharp line. Missing probs are pending, not 0.0 / maximal divergence."""
     public_n = number(row.get("public_probability"))
     sharp_n = number(row.get("sharp_probability"))
-    divergence_n = number(row.get("divergence"))
-    if public_n is None or sharp_n is None:
+    gap = market_divergence(row)
+    if public_n is None or sharp_n is None or gap is None:
         return "observation pending"
-    public = public_n * 100
-    sharp = sharp_n * 100
-    divergence = (divergence_n if divergence_n is not None else (sharp_n - public_n)) * 100
-    return f"{public:.1f}%  →  {sharp:.1f}%   ({divergence:+.1f})"
+    return f"{public_n * 100:.1f}%  →  {sharp_n * 100:.1f}%   ({gap * 100:+.1f})"
 
 
 def _canvas() -> tuple[Image.Image, ImageDraw.ImageDraw]:
@@ -174,8 +181,30 @@ def _updated_label(bundle: dict) -> str:
     return raw.replace("T", " ")[:19] + (" UTC" if raw else "")
 
 
+def _favorite_win_probability(away_p: float | None, home_p: float | None) -> float | None:
+    """Largest observed side. Missing sides stay missing — never 0.5."""
+    observed = [p for p in (away_p, home_p) if p is not None]
+    return max(observed) if observed else None
+
+
+def _fmt_win_pct(probability: float | None) -> str:
+    return f"{probability * 100:.0f}%" if probability is not None else "—"
+
+
+def _model_separation_sort_key(game: dict) -> float:
+    """Rank by observed favorite probability. Games with no probs sort last, not as 0.5."""
+    projection = game.get("projection") or {}
+    favorite = _favorite_win_probability(
+        number(projection.get("away_win_probability")),
+        number(projection.get("home_win_probability")),
+    )
+    return favorite if favorite is not None else float("-inf")
+
+
 def _separation(probability: float | None) -> tuple[str, str]:
-    pct = (probability or 0.5) * 100
+    if probability is None:
+        return "PENDING", MUTED
+    pct = probability * 100
     if pct >= 65:
         return "LOPSIDED", RED
     if pct >= 60:
@@ -225,8 +254,7 @@ def _draw_game_card(
     projection = game.get("projection") or {}
     away_p = number(projection.get("away_win_probability"))
     home_p = number(projection.get("home_win_probability"))
-    favorite_p = max(away_p or 0.5, home_p or 0.5)
-    label, tone = _separation(favorite_p)
+    label, tone = _separation(_favorite_win_probability(away_p, home_p))
     away, home = game.get("away", "AWY"), game.get("home", "HME")
 
     draw.text((x1 + 22, y1 + 17), f"#{rank}", font=FONTS["rank"], fill=PURPLE)
@@ -246,18 +274,19 @@ def _draw_game_card(
     bar_x1, bar_x2, bar_y = x1 + 22, x2 - 22, y1 + 109
     bar_width = bar_x2 - bar_x1
     draw.rounded_rectangle((bar_x1, bar_y, bar_x2, bar_y + 13), radius=7, fill="#282C38")
-    split = bar_x1 + int(bar_width * (away_p or 0.5))
-    draw.rounded_rectangle((bar_x1, bar_y, split, bar_y + 13), radius=7, fill=BLUE)
-    draw.rounded_rectangle((split, bar_y, bar_x2, bar_y + 13), radius=7, fill=PURPLE)
+    if away_p is not None and home_p is not None:
+        split = bar_x1 + int(bar_width * away_p)
+        draw.rounded_rectangle((bar_x1, bar_y, split, bar_y + 13), radius=7, fill=BLUE)
+        draw.rounded_rectangle((split, bar_y, bar_x2, bar_y + 13), radius=7, fill=PURPLE)
     draw.text(
         (bar_x1, bar_y + 18),
-        f"{(away_p or 0.5) * 100:.0f}% {away}",
+        f"{_fmt_win_pct(away_p)} {away}",
         font=FONTS["tiny"],
         fill=MUTED,
     )
     draw.text(
         (bar_x2, bar_y + 18),
-        f"{home} {(home_p or 0.5) * 100:.0f}%",
+        f"{home} {_fmt_win_pct(home_p)}",
         font=FONTS["tiny"],
         fill=MUTED,
         anchor="ra",
@@ -311,13 +340,7 @@ def _draw_game_card(
 
 def render_morning_slate(bundle: dict, out_dir: Path) -> list[Path]:
     games = list(bundle.get("games") or [])
-    games.sort(
-        key=lambda game: max(
-            number((game.get("projection") or {}).get("away_win_probability")) or 0.5,
-            number((game.get("projection") or {}).get("home_win_probability")) or 0.5,
-        ),
-        reverse=True,
-    )
+    games.sort(key=_model_separation_sort_key, reverse=True)
     count = len(games)
     pages = min(3, max(1, math.ceil(count / 5)))
     per_page = math.ceil(count / pages)
@@ -460,15 +483,13 @@ def _draw_market_panel(
             " · ".join(part for part in (str(row.get("game") or ""), primary) if part),
             52,
         )
-        public_n = number(row.get("public_probability"))
-        sharp_n = number(row.get("sharp_probability"))
         move = format_market_move(row)
         draw.text((x1 + 26, y), label or "Market observation", font=FONTS["body_bold"], fill=TEXT)
-        tone = MUTED
-        if public_n is not None and sharp_n is not None:
-            divergence_n = number(row.get("divergence"))
-            divergence = (divergence_n if divergence_n is not None else (sharp_n - public_n))
-            tone = GREEN if divergence > 0 else RED
+        gap = market_divergence(row)
+        if gap is None:
+            tone = MUTED
+        else:
+            tone = GREEN if gap > 0 else RED
         draw.text(
             (x2 - 26, y),
             move,

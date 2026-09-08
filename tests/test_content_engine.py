@@ -1,15 +1,28 @@
 from __future__ import annotations
 
 import csv
+import inspect
 import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
 
+from chase_content.cli import REPORTS
 from chase_content.migrate import load_pipeline, load_sharp
-from chase_content.render import format_market_move, format_osi_window, render_reports
+from chase_content.render import (
+    MUTED,
+    _favorite_win_probability,
+    _fmt_win_pct,
+    _model_separation_sort_key,
+    _separation,
+    format_market_move,
+    format_osi_window,
+    market_divergence,
+    render_reports,
+)
 from chase_content.validate import validate_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -133,6 +146,29 @@ class BundleAndRenderTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 render_reports(self.bundle, Path(temp), "morning-slate")
 
+    def test_render_reports_invokes_validate_bundle(self):
+        with tempfile.TemporaryDirectory() as temp, patch(
+            "chase_content.render.validate_bundle", return_value=[]
+        ) as mocked:
+            render_reports(self.bundle, Path(temp), "offensive-report")
+            mocked.assert_called_once()
+            self.assertEqual(mocked.call_args.args[0], self.bundle)
+            self.assertTrue(mocked.call_args.kwargs.get("require_projections"))
+
+    def test_missing_required_values_fail_closed(self):
+        self.bundle["games"][0]["projection"].pop("away_win_probability")
+        problems = validate_bundle(self.bundle, require_projections=True)
+        self.assertTrue(any("win probabilities are missing" in problem for problem in problems))
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaises(ValueError) as raised:
+                render_reports(self.bundle, Path(temp), "morning-slate")
+        self.assertIn("win probabilities are missing", str(raised.exception))
+
+    def test_invalid_market_probabilities_fail_closed(self):
+        self.bundle["markets"]["ml"][0]["sharp_probability"] = None
+        problems = validate_bundle(self.bundle)
+        self.assertTrue(any("invalid public/sharp probability" in problem for problem in problems))
+
     def test_missing_osi_and_market_values_are_not_zero(self):
         self.assertEqual(
             format_osi_window({"osi_ytd": None, "osi_l7": None}),
@@ -142,16 +178,72 @@ class BundleAndRenderTests(unittest.TestCase):
             format_market_move({"public_probability": None, "sharp_probability": 0.6}),
             "observation pending",
         )
+        self.assertIsNone(market_divergence({"public_probability": None, "sharp_probability": 0.6}))
+        self.assertIsNone(market_divergence({}))
+        self.assertAlmostEqual(
+            market_divergence({"public_probability": 0.4, "sharp_probability": 0.55}),
+            0.15,
+        )
         self.assertNotIn("0.0%", format_market_move({}))
         self.assertNotIn("+0.0", format_osi_window({}))
 
-    def test_bundled_fonts_are_dm_sans_and_roboto_condensed(self):
-        from chase_content.render import FONTS, _FONTS_DIR
+    def test_missing_win_probability_is_not_fabricated(self):
+        self.assertIsNone(_favorite_win_probability(None, None))
+        self.assertEqual(_fmt_win_pct(None), "—")
+        self.assertEqual(_fmt_win_pct(0.66), "66%")
+        self.assertEqual(_separation(None), ("PENDING", MUTED))
+        self.assertNotEqual(_separation(None)[0], "TOSS-UP")
+        self.assertEqual(
+            _model_separation_sort_key({"projection": {}}),
+            float("-inf"),
+        )
 
-        self.assertTrue((_FONTS_DIR / "DMSans-Regular.ttf").is_file())
-        self.assertTrue((_FONTS_DIR / "RobotoCondensed-Bold.ttf").is_file())
+    def test_renderer_source_has_no_fabricated_probability_defaults(self):
+        source = (ROOT / "chase_content" / "render.py").read_text(encoding="utf-8")
+        for needle in ("or 0.5", "or 0.0", "or 0)", "or 0,", "or 0 "):
+            self.assertNotIn(needle, source)
+
+    def test_bundled_fonts_are_dm_sans_and_roboto_condensed(self):
+        from chase_content.render import FONTS, _FONTS_DIR, _font
+
+        for name in (
+            "DMSans-Regular.ttf",
+            "DMSans-Bold.ttf",
+            "RobotoCondensed-Regular.ttf",
+            "RobotoCondensed-Bold.ttf",
+            "RobotoCondensed-ExtraBold.ttf",
+        ):
+            path = _FONTS_DIR / name
+            self.assertTrue(path.is_file(), msg=path)
+            self.assertGreater(path.stat().st_size, 1000)
+
+        loaded = _font(24, display=False, bold=False)
+        self.assertTrue(Path(loaded.path).is_file())
+        self.assertTrue(str(Path(loaded.path).resolve()).startswith(str(_FONTS_DIR.resolve())))
         self.assertTrue(FONTS["title"].getname()[0].startswith("Roboto Condensed"))
         self.assertTrue(FONTS["body"].getname()[0].startswith("DM Sans"))
+
+        for path in (ROOT / "chase_content").rglob("*.py"):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("fonts.googleapis.com", text, msg=str(path))
+            self.assertNotIn("fonts.gstatic.com", text, msg=str(path))
+            self.assertNotIn("@font-face", text, msg=str(path))
+
+    def test_metallic_fill_is_only_used_on_major_headings(self):
+        source = inspect.getsource(__import__("chase_content.render", fromlist=["render"]))
+        self.assertIn("_metallic_text(image, (60, 82), title, FONTS[\"title\"])", source)
+        self.assertIn("_metallic_text(image, (x1 + 26, y1 + 24), title, FONTS[\"panel_title\"])", source)
+        self.assertIn("_metallic_text(image, (x1 + 26, y1 + 20), _market_title(category), FONTS[\"panel_title\"])", source)
+        call_count = source.count("_metallic_text(")
+        self.assertEqual(call_count, 4)  # definition + 3 call sites
+
+    def test_featured_matchup_is_dropped_not_emitted(self):
+        contracts = json.loads((ROOT / "content_plan" / "report_contracts.json").read_text(encoding="utf-8"))
+        self.assertEqual(contracts["featured-matchup"]["status"], "dropped")
+        self.assertNotIn("featured-matchup", REPORTS)
+        import chase_content.render as render_mod
+
+        self.assertFalse(hasattr(render_mod, "render_featured_matchup"))
 
 
 if __name__ == "__main__":
