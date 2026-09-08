@@ -103,7 +103,13 @@ def _metallic_text(
         for col in range(width):
             pixels[col, row] = color
     mask = Image.new("L", (width, height), 0)
-    ImageDraw.Draw(mask).text((xy[0] - x0, xy[1] - y0), text, font=font, fill=255)
+    ImageDraw.Draw(mask).text(
+        (xy[0] - x0, xy[1] - y0),
+        text,
+        font=font,
+        fill=255,
+        anchor=anchor,
+    )
     image.paste(grad, (x0, y0), mask)
 
 
@@ -119,13 +125,12 @@ def format_osi_window(row: dict) -> str:
 
 
 def market_divergence(row: dict) -> float | None:
-    """Signed public→sharp gap, or None when an observation is missing (never 0.0 / 0.5)."""
+    """Signed public→sharp gap from the probabilities. Never trust a supplied override."""
     public_n = number(row.get("public_probability"))
     sharp_n = number(row.get("sharp_probability"))
     if public_n is None or sharp_n is None:
         return None
-    divergence_n = number(row.get("divergence"))
-    return divergence_n if divergence_n is not None else (sharp_n - public_n)
+    return sharp_n - public_n
 
 
 def format_market_move(row: dict) -> str:
