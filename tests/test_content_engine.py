@@ -10,14 +10,14 @@ from unittest.mock import patch
 
 from PIL import Image, ImageDraw
 
+from chase_content import render
 from chase_content.cli import REPORTS
 from chase_content.migrate import load_pipeline, load_sharp
 from chase_content.render import (
     FONTS,
     MUTED,
     _FONTS_DIR,
-    _favorite_win_probability,
-    _fmt_win_pct,
+    _run_separation,
     _font,
     _model_separation_sort_key,
     _separation,
@@ -188,16 +188,44 @@ class BundleAndRenderTests(unittest.TestCase):
         self.assertNotIn("0.0%", format_market_move({}))
         self.assertNotIn("+0.0", format_osi_window({}))
 
-    def test_missing_win_probability_is_not_fabricated(self):
-        self.assertIsNone(_favorite_win_probability(None, None))
-        self.assertEqual(_fmt_win_pct(None), "—")
-        self.assertEqual(_fmt_win_pct(0.66), "66%")
+    def test_missing_projection_is_not_fabricated(self):
+        self.assertIsNone(_run_separation({"projection": {}}))
         self.assertEqual(_separation(None), ("PENDING", MUTED))
         self.assertNotEqual(_separation(None)[0], "TOSS-UP")
         self.assertEqual(
             _model_separation_sort_key({"projection": {}}),
             float("-inf"),
         )
+
+    def test_ranking_and_labels_derive_from_runs_not_probability(self):
+        """Contract 5.2 and 5.5.
+
+        `_model_separation_sort_key` previously ranked by win probability while
+        being named for run separation, so the violation read as fixed. A close
+        game with a lopsided probability must not outrank a genuine blowout.
+        """
+        blowout = {"projection": {"away_runs": 2.0, "home_runs": 6.0,
+                                  "away_win_probability": 0.51,
+                                  "home_win_probability": 0.49}}
+        coinflip = {"projection": {"away_runs": 4.1, "home_runs": 4.3,
+                                   "away_win_probability": 0.05,
+                                   "home_win_probability": 0.95}}
+        self.assertEqual(_run_separation(blowout), 4.0)
+        self.assertGreater(
+            _model_separation_sort_key(blowout),
+            _model_separation_sort_key(coinflip),
+        )
+        self.assertEqual(_separation(_run_separation(blowout))[0], "LOPSIDED")
+        self.assertEqual(_separation(_run_separation(coinflip))[0], "TOSS-UP")
+        for sep, label in ((1.5, "LOPSIDED"), (1.0, "CLEAR EDGE"),
+                           (0.5, "LEAN"), (0.49, "TOSS-UP")):
+            self.assertEqual(_separation(sep)[0], label)
+
+    def test_morning_slate_shows_no_win_probability(self):
+        """Contract 5.5: no %, no win-prob bar, no probability-derived split."""
+        source = Path(render.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("win_probability", source)
+        self.assertNotIn("60A5FA", source)
 
     def test_renderer_source_has_no_fabricated_probability_defaults(self):
         source = (ROOT / "chase_content" / "render.py").read_text(encoding="utf-8")
