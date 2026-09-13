@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 
 from chase_content.migrate import migrate
 from chase_content.render import render_reports
+from chase_content.render_site import SITE_REPORTS, render_site_reports
+from chase_content.site import load_site_bundle, validate_site_bundle
 from chase_content.util import read_json, write_json
 from chase_content.validate import validate_bundle
 
@@ -94,6 +96,70 @@ def _daily(args: argparse.Namespace) -> int:
     return 0
 
 
+def _site_source(args: argparse.Namespace) -> dict:
+    return load_site_bundle(
+        site_root=_path(getattr(args, "site_root", None)),
+        site_base=getattr(args, "site_base", None),
+    )
+
+
+def _sync_site(args: argparse.Namespace) -> int:
+    bundle = _site_source(args)
+    problems = validate_site_bundle(bundle, max_age_hours=args.max_age_hours)
+    if problems:
+        _print_problems(problems)
+        return 1
+    output = Path(args.out)
+    write_json(output, bundle)
+    print(f"Wrote canonical site bundle: {output}")
+    return 0
+
+
+def _validate_site(args: argparse.Namespace) -> int:
+    problems = validate_site_bundle(
+        read_json(Path(args.bundle)), max_age_hours=args.max_age_hours
+    )
+    if problems:
+        _print_problems(problems)
+        return 1
+    print(f"Site bundle valid: {args.bundle}")
+    return 0
+
+
+def _site_build(args: argparse.Namespace) -> int:
+    bundle = read_json(Path(args.bundle))
+    try:
+        paths = render_site_reports(bundle, Path(args.out), args.report, args.game)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+    for path in paths:
+        print(f"Wrote graphic: {path}")
+    return 0
+
+
+def _site_daily(args: argparse.Namespace) -> int:
+    bundle = _site_source(args)
+    problems = validate_site_bundle(bundle, max_age_hours=args.max_age_hours)
+    if problems:
+        _print_problems(problems)
+        return 1
+    out_dir = Path(args.out)
+    bundle_path = out_dir / "site-content-bundle.json"
+    write_json(bundle_path, bundle)
+    print(f"Wrote canonical site bundle: {bundle_path}")
+    for path in render_site_reports(bundle, out_dir, args.report, args.game):
+        print(f"Wrote graphic: {path}")
+    return 0
+
+
+def _add_site_source(parser: argparse.ArgumentParser) -> None:
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--site-root", help="Local chase-analytics.com repository root")
+    source.add_argument("--site-base", help="Published site base URL")
+    parser.add_argument("--max-age-hours", type=float)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="chase-content",
@@ -128,6 +194,32 @@ def build_parser() -> argparse.ArgumentParser:
     daily.add_argument("--opinions")
     daily.add_argument("--out", required=True)
     daily.set_defaults(handler=_daily)
+
+    sync_site = sub.add_parser(
+        "sync-site", help="Build a canonical MLB + NFL bundle from public site contracts"
+    )
+    _add_site_source(sync_site)
+    sync_site.add_argument("--out", required=True)
+    sync_site.set_defaults(handler=_sync_site)
+
+    validate_site = sub.add_parser("validate-site", help="Validate a canonical site bundle")
+    validate_site.add_argument("--bundle", required=True)
+    validate_site.add_argument("--max-age-hours", type=float)
+    validate_site.set_defaults(handler=_validate_site)
+
+    site_build = sub.add_parser("site-build", help="Render current-site MLB and NFL reports")
+    site_build.add_argument("--bundle", required=True)
+    site_build.add_argument("--report", choices=SITE_REPORTS, default="all")
+    site_build.add_argument("--game", help="NFL AWAY@HOME key or game id")
+    site_build.add_argument("--out", required=True)
+    site_build.set_defaults(handler=_site_build)
+
+    site_daily = sub.add_parser("site-daily", help="Sync, validate, and render public site data")
+    _add_site_source(site_daily)
+    site_daily.add_argument("--report", choices=SITE_REPORTS, default="all")
+    site_daily.add_argument("--game", help="NFL AWAY@HOME key or game id")
+    site_daily.add_argument("--out", required=True)
+    site_daily.set_defaults(handler=_site_daily)
 
     return parser
 

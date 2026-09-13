@@ -2,7 +2,15 @@
 
 Creates consistent, reviewable social content from the Chase Analytics ecosystem.
 
-The repository has three upstream responsibilities:
+The repository has two operating modes:
+
+- **Current-site mode** — consumes the exact public MLB and NFL JSON contracts used by
+  chase-analytics.com, validates freshness and identity, and renders the current matchup
+  experience without recalculating site metrics.
+- **Legacy MLB model mode** — combines pipeline, projection, and paired-market sources for
+  the original Morning Slate, Offensive Report, and Public vs Sharp graphics.
+
+The legacy mode has three upstream responsibilities:
 
 - **MLBMA Pipeline** — current slate, team offense, handedness splits, and trends.
 - **MLB Model** — game probabilities, projected runs, and pitcher projections.
@@ -17,7 +25,46 @@ The operating cadence is versioned in
 data contract lives in
 [`content_plan/report_contracts.json`](content_plan/report_contracts.json).
 
-## Reports
+## Current-site reports
+
+1. **MLB Live Slate** — every published matchup in chronological order with starters,
+   lineup state, records, and conditions.
+2. **NFL Weekly** — cards grouped by NFL week and ordered by kickoff, never filtered by
+   the number of games carrying model output.
+3. **NFL Matchup** — a four-image analysis set: position-based starting offense/defense
+   with availability, coverage/pressure confrontation, separate QB/RB/WR evidence, and
+   mirrored team-form ranks.
+
+NFL graphics follow the live product rules: segmented block meters, red/yellow/green rank
+bands, purple only for brand/selection, `Active` when no injury designation is attached,
+and an em-dash rather than a fabricated zero for missing evidence.
+
+## Current-site commands
+
+```bash
+# Read a local checkout of chase-analytics.com.
+chase-content sync-site --site-root ../mlbma-pipeline --out build/site.json
+
+# Or read the deployed public contracts directly.
+chase-content sync-site --site-base https://chase-analytics.com --out build/site.json
+
+# Validate independently; optionally enforce a freshness ceiling.
+chase-content validate-site --bundle build/site.json --max-age-hours 36
+
+# Render both public slates, or a four-part NFL matchup analysis.
+chase-content site-build --bundle build/site.json --report all --out dist/site
+chase-content site-build --bundle build/site.json --report nfl-matchup \
+  --game ATL@PIT --out dist/site
+
+# One-step live sync + validation + render. This performs no odds fetch.
+chase-content site-daily --site-base https://chase-analytics.com \
+  --report nfl-weekly --out dist/site
+```
+
+The engine reads only `/data/public/...` endpoints in current-site mode. It does not scrape
+the rendered page, call a model, fetch odds, or rewrite league ranks.
+
+## Legacy MLB reports
 
 1. **Morning Slate** — games ranked from most lopsided to most even, with game and
    pitcher projections plus a clearly separated personal-opinion tag.

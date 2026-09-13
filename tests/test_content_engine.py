@@ -27,6 +27,8 @@ from chase_content.render import (
     render_reports,
 )
 from chase_content.validate import validate_bundle
+from chase_content.render_site import _status_index, render_site_reports
+from chase_content.site import find_game, load_site_bundle, validate_site_bundle
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -364,6 +366,89 @@ class SharpZeroObservationTests(unittest.TestCase):
             self.assertAlmostEqual(result["ml"][0]["divergence"], -0.4)
             self.assertAlmostEqual(result["totals"][0]["sharp_probability"], 0.0)
             self.assertAlmostEqual(result["totals"][0]["divergence"], -0.4)
+
+
+class CurrentSiteContractTests(unittest.TestCase):
+    def _site_root(self, temp: str) -> Path:
+        root = Path(temp)
+        public = root / "data" / "public"
+        (public / "mlb").mkdir(parents=True)
+        (public / "nfl").mkdir(parents=True)
+        mlb_game = {
+            "id": "mlb-1", "sport": "mlb", "kickoff_utc": "2026-09-13T20:00:00Z",
+            "away": "NYY", "home": "BOS", "away_name": "New York Yankees",
+            "home_name": "Boston Red Sox", "away_record": "80-68", "home_record": "78-70",
+            "away_starter": "Away Starter", "home_starter": "Home Starter",
+            "away_hand": "R", "home_hand": "L", "away_era": "3.20", "home_era": "3.80",
+            "away_lineup_state": "Confirmed", "home_lineup_state": "Expected",
+        }
+        player = {"name": "Test Player", "position": "QB", "group": "Backfield"}
+        rates = {"off_epa": {"label": "Offensive EPA Per Play", "value": 0.1,
+                              "better": "high", "rank": 4, "of": 32}}
+        scheme = {
+            "source_seasons": [2025],
+            "offense": {"coverage": {}, "pressure": {}, "response": {}},
+            "defense": {"coverage": {}, "pressure": {}, "response": {}},
+            "league_frequency_ranks": {"offense": {}, "defense": {}},
+        }
+        nfl_game = {
+            "id": "nfl-1", "sport": "nfl", "kickoff_utc": "2026-09-13T17:00:00Z",
+            "away": "ATL", "home": "PIT", "away_name": "Atlanta Falcons",
+            "home_name": "Pittsburgh Steelers", "scheme_source": {"week": 1},
+            "away_lineups": {"offense": {"players": [player]}, "defense": {"players": []}},
+            "home_lineups": {"offense": {"players": [player]}, "defense": {"players": []}},
+            "away_availability_list": [], "home_availability_list": [],
+            "away_form": {"rates": rates}, "home_form": {"rates": rates},
+            "away_scheme": scheme, "home_scheme": scheme,
+            "away_player_scheme": [], "home_player_scheme": [],
+            "away_player_coverage": [], "home_player_coverage": [],
+        }
+        meta = {"schema": "chase-public-slate/1", "generated_at_utc": "2026-09-13T15:00:00Z",
+                "data_through_utc": "2026-09-13T14:55:00Z"}
+        (public / "mlb" / "slate.json").write_text(
+            json.dumps({**meta, "sport": "mlb", "games": [mlb_game]}), encoding="utf-8"
+        )
+        (public / "nfl" / "slate.json").write_text(
+            json.dumps({**meta, "sport": "nfl", "games": [nfl_game]}), encoding="utf-8"
+        )
+        (public / "nfl" / "team_context.json").write_text(
+            json.dumps({"season": 2026, "week": 1, "teams": {}}), encoding="utf-8"
+        )
+        return root
+
+    def test_site_adapter_preserves_week_and_all_games(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = load_site_bundle(site_root=self._site_root(temp))
+            self.assertEqual(bundle["schema"], "chase-content-site/2")
+            self.assertEqual(bundle["sports"]["nfl"]["games"][0]["week"], 1)
+            self.assertEqual(find_game(bundle, "nfl", "ATL@PIT")["id"], "nfl-1")
+            self.assertEqual(
+                validate_site_bundle(
+                    bundle,
+                    now=__import__("datetime").datetime(2026, 9, 13, 16, tzinfo=__import__("datetime").timezone.utc),
+                ),
+                [],
+            )
+
+    def test_site_validation_rejects_future_source_time(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = load_site_bundle(site_root=self._site_root(temp))
+            bundle["sports"]["nfl"]["generated_at_utc"] = "2026-09-14T00:00:00Z"
+            now = __import__("datetime").datetime(2026, 9, 13, 16, tzinfo=__import__("datetime").timezone.utc)
+            self.assertTrue(any("future" in item for item in validate_site_bundle(bundle, now=now)))
+
+    def test_no_injury_designation_means_active(self):
+        game = {"away_availability_list": []}
+        self.assertEqual(_status_index(game, "away").get("test player", "Active"), "Active")
+
+    def test_current_site_reports_render(self):
+        with tempfile.TemporaryDirectory() as temp, tempfile.TemporaryDirectory() as out:
+            bundle = load_site_bundle(site_root=self._site_root(temp))
+            paths = render_site_reports(bundle, Path(out), "nfl-matchup", "ATL@PIT")
+            self.assertEqual(len(paths), 4)
+            for path in paths:
+                with Image.open(path) as image:
+                    self.assertEqual(image.size, (1080, 1350))
 
 
 if __name__ == "__main__":

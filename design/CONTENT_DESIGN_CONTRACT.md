@@ -5,6 +5,40 @@
 X). A graphic that violates a MUST rule here is not publishable.
 **Applies to:** `chase_content/render.py` and any future renderer or image-generation agent.
 
+**Current-site extension:** `chase_content/render_site.py`,
+`content_plan/site_surfaces.json`, and the `chase-content-site/2` bundle. The original MLB
+model reports remain supported, but they no longer describe the whole Chase Analytics product.
+
+## 0.1 Cross-sport product contract (2026-09-13)
+
+Current-site content MUST be derived from the same versioned public contracts consumed by the
+live site: `/data/public/mlb/slate.json`, `/data/public/nfl/slate.json`, and
+`/data/public/nfl/team_context.json`. The content engine is downstream: it may format, paginate,
+filter by an explicit game key, and rank only where the published contract already supplies the
+rank. It MUST NOT independently manufacture a lineup, availability designation, NFL week,
+coverage response, team-form grade, or model result.
+
+The site now has two first-class sports. MLB content is organized by slate date and first pitch.
+NFL content is organized by **week**, then chronologically by kickoff. Every public NFL game is
+eligible for a matchup card even when no model output exists.
+
+An NFL matchup analysis is a four-part comparative story:
+
+1. Position-based starting offense and defense for both clubs. Attach the official availability
+   designation; when the player has no designation, display `Active`.
+2. Coverage and pressure confrontation. Put defensive frequency directly beside the opposing
+   offense's EPA response on the same row. Blitz, pressure, and stacked-box rate are not isolated
+   team facts.
+3. Separate QB, RB, and WR evidence. QB and RB use their published scheme splits; WR uses
+   coverage splits. Every grade is relative to its published position pool.
+4. Mirrored Team Form. Both clubs use identical row geometry and a shared league-rank scale.
+
+All quantitative bars in these current-site graphics are ten-cell segmented block meters.
+Continuous generic progress bars are prohibited. Rank and performance meters use only the
+red/yellow/green spectrum. Purple remains a brand, selection, and navigation color; it never
+means good performance. Missing data renders as an em-dash with a concise unavailable reason,
+never `0`, `50%`, or a styled blank.
+
 This is an enforceable contract, not design advice. Every rule is measurable. Where a rule
 constrains a pixel value, that value is the contract — not a suggestion. Subjective language
 ("clean", "pop", "modern") is deliberately absent.

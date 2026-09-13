@@ -1,0 +1,80 @@
+{
+  "version": "2026-09-13",
+  "site": "https://chase-analytics.com",
+  "navigation": {
+    "home": "/",
+    "mlb": "/mlb/",
+    "nfl": "/nfl/",
+    "model_center": "/model-center/"
+  },
+  "public_data": {
+    "mlb_slate": "/data/public/mlb/slate.json",
+    "nfl_slate": "/data/public/nfl/slate.json",
+    "nfl_team_context": "/data/public/nfl/team_context.json"
+  },
+  "mlb": {
+    "slate": {
+      "route": "/mlb/matchups.html",
+      "card_selector": ".hero-matchup-card",
+      "content": ["teams", "records", "starters", "ERA", "lineup state", "weather"]
+    },
+    "matchup": {
+      "route": "/mlb/matchup.html?game={game_id}",
+      "sections": {
+        "overview": "#overview",
+        "starting_pitchers": "#starters",
+        "lineups": "#lineups",
+        "team_form": "#form",
+        "radar": "#radar",
+        "bullpen": "#bullpen",
+        "park_weather": "#team-context"
+      }
+    },
+    "render_routes": {
+      "team_rankings": "/render/team_rankings.html",
+      "team_profile": "/render/team_profile.html",
+      "pitcher_profile": "/render/pitcher_profile.html",
+      "bullpen_report": "/render/bullpen_report.html",
+      "pitcher_intelligence": "/render/pitcher_intelligence.html"
+    }
+  },
+  "nfl": {
+    "slate": {
+      "route": "/nfl/matchups.html",
+      "group": "week",
+      "sort": "kickoff_utc",
+      "card_selector": ".hero-matchup-card"
+    },
+    "matchup": {
+      "route": "/nfl/matchup.html?game={game_id}",
+      "sections": {
+        "overview": "#overview",
+        "starting_lineups": "#availability",
+        "scheme_confrontation": "#scheme",
+        "team_form": "#form",
+        "radar": "#radar",
+        "rest_travel": "#team-context"
+      },
+      "artifact_selectors": {
+        "lineup_boards": ".ca-lineup-board",
+        "player_cards": ".ca-lineup-player",
+        "injury_report": ".ca-injury-report",
+        "season_toggle": ".ca-season-toggle",
+        "scheme_panels": ".ca-scheme-panel",
+        "coverage_matrix": ".ca-coverage-matrix",
+        "pressure_matchups": ".ca-pressure-matchup",
+        "skill_players_by_coverage": ".ca-player-coverage",
+        "qb_rb_by_scheme": ".ca-player-scheme",
+        "team_form_mirror": ".ca-mirror",
+        "segmented_meter": ".ca-segment-meter"
+      }
+    }
+  },
+  "capture_rules": [
+    "Hide global sticky navigation and interactive-only controls in static exports.",
+    "Capture the selected NFL season state; never relabel prior-season evidence.",
+    "Preserve team symmetry and one shared comparison scale.",
+    "Do not capture a styled blank, browser-clock fallback, or missing value as zero.",
+    "Use the public JSON as the factual source and rendered selectors as visual references."
+  ]
+}

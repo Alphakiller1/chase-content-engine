@@ -2,6 +2,18 @@
   "timezone": "America/New_York",
   "publishing": [
     {
+      "time": "08:30",
+      "report": "nfl-weekly",
+      "label": "NFL Weekly Matchups",
+      "seasonality": "NFL game weeks",
+      "requirements": [
+        "public NFL slate",
+        "week assignment",
+        "chronological kickoff order",
+        "all published games included"
+      ]
+    },
+    {
       "time": "09:00",
       "report": "morning-slate",
       "label": "Morning Slate",
@@ -30,6 +42,18 @@
         "same-day paired odds",
         "sharp and public book coverage",
         "market timestamp"
+      ]
+    },
+    {
+      "time": "16:00",
+      "report": "nfl-matchup",
+      "label": "NFL Matchup Analysis",
+      "seasonality": "selected NFL matchups",
+      "requirements": [
+        "starting offense and defense",
+        "official availability designations",
+        "scheme and team-form evidence",
+        "QB RB and WR splits"
       ]
     }
   ],

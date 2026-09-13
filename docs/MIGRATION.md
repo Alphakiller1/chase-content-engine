@@ -1,5 +1,25 @@
 # Migration Project
 
+## Current public-site adapter
+
+The preferred cross-sport path is now `sync-site` / `site-daily`. It reads the exact public
+JSON used by chase-analytics.com and emits `chase-content-site/2`. This is intentionally
+separate from the legacy MLB model migration below: the public adapter preserves the site's
+already-published rankings, NFL scheme samples, starting units, availability, player splits,
+and team context without importing pipeline internals or invoking model code.
+
+| Public contract | Content responsibility |
+| --- | --- |
+| `data/public/mlb/slate.json` | Current MLB matchup cards, starters, lineups, conditions |
+| `data/public/nfl/slate.json` | Week-based NFL cards and all nested matchup evidence |
+| `data/public/nfl/team_context.json` | NFL season/week identity and league pools |
+
+The adapter accepts either a local site checkout (`--site-root`) or the deployed origin
+(`--site-base`). `--max-age-hours` is an optional fail-closed freshness gate. Missing or future
+timestamps, duplicate game IDs, sport mismatches, and empty slates fail validation. A successful
+sync does not imply that model coverage exists for every game, and model coverage is never used
+to remove a public matchup.
+
 ## Goal
 
 Give content production one stable command surface while MLBMA Pipeline, MLB Model, and

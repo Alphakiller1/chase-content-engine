@@ -1,6 +1,67 @@
 {
-  "_contract_version": "1.0.0",
+  "_contract_version": "2.0.0",
   "_governed_by": "design/CONTENT_DESIGN_CONTRACT.md",
+  "_public_site_contracts": {
+    "mlb": "/data/public/mlb/slate.json",
+    "nfl": "/data/public/nfl/slate.json",
+    "nfl_team_context": "/data/public/nfl/team_context.json",
+    "rule": "Preserve published values and ranks. Never infer an absent value as zero."
+  },
+  "mlb-live-slate": {
+    "source": "chase-analytics public MLB slate",
+    "sort": "kickoff_utc_ascending",
+    "cards_per_graphic": 5,
+    "required_fields": [
+      "teams and records",
+      "start time",
+      "probable starters and handedness",
+      "published ERA or em-dash",
+      "lineup status",
+      "weather or explicit unavailable state"
+    ],
+    "prohibited_fields": ["invented model projection", "invented betting recommendation"]
+  },
+  "nfl-weekly": {
+    "source": "chase-analytics public NFL slate",
+    "group": "week",
+    "sort": "kickoff_utc_ascending within week",
+    "cards_per_graphic": 4,
+    "required_fields": [
+      "week",
+      "teams and records",
+      "start time only in the time position",
+      "starting quarterback",
+      "availability summary",
+      "game state"
+    ],
+    "rule": "Every published game renders; model coverage never filters the slate."
+  },
+  "nfl-matchup": {
+    "source": "chase-analytics public NFL slate nested matchup evidence",
+    "graphics": [
+      "starting offense and defense with availability",
+      "scheme confrontation",
+      "QB RB WR scheme production",
+      "mirrored team form"
+    ],
+    "required_fields": [
+      "position-based starting units",
+      "Active designation when no injury designation exists",
+      "defensive coverage frequency beside opponent offensive EPA",
+      "blitz pressure and stacked-box frequency beside opponent response EPA",
+      "QB RB and WR position sections",
+      "league-relative rank coloring",
+      "source season",
+      "em-dash for absent evidence"
+    ],
+    "visual_rules": [
+      "segmented block meters only",
+      "red yellow green spectrum for rank and performance",
+      "purple is brand or selection only",
+      "mirrored teams share one scale",
+      "no generic continuous progress bars"
+    ]
+  },
   "morning-slate": {
     "sort": "model_run_separation_desc",
     "max_graphics": 3,
