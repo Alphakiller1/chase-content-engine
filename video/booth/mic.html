@@ -22,6 +22,20 @@
       .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
       h1 { font-size: 34px; line-height: 1.05; margin: 8px 0 12px; }
       p { color: var(--muted); line-height: 1.45; }
+      code { color: var(--text); font-weight: 800; letter-spacing: 0.08em; }
+      input {
+        width: 100%;
+        margin-top: 12px;
+        border: 1px solid #3f3f46;
+        border-radius: 12px;
+        background: var(--card);
+        color: var(--text);
+        font-size: 22px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 14px 16px;
+      }
       button {
         width: 100%;
         margin-top: 24px;
@@ -46,19 +60,23 @@
     <main>
       <div class="eyebrow">Recording booth</div>
       <h1>This phone is the microphone.</h1>
-      <p>The desktop camera stays on the computer. Keep this page open and this phone a foot from your mouth while you record.</p>
+      <p>The desktop camera stays on the computer. Open this link from Setup on the booth, tap Allow, and keep the page open a foot from your mouth.</p>
+      <input id="room" type="text" inputmode="text" autocomplete="off" spellcheck="false" maxlength="8" placeholder="ROOM CODE" />
       <button id="go" type="button">Use this phone as the mic</button>
       <div class="meter"><div id="bar"></div></div>
-      <div class="status wait" id="st">Waiting — tap the button, then Allow microphone.</div>
+      <div class="status wait" id="st">Waiting — enter the code from the computer if it is not already in the link.</div>
     </main>
-    <script type="module">
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script>
       const st = document.getElementById("st");
       const bar = document.getElementById("bar");
       const go = document.getElementById("go");
+      const roomEl = document.getElementById("room");
       const say = (t, k) => { st.textContent = t; st.className = "status " + (k || "wait"); };
+      const params = new URLSearchParams(location.search);
+      if (params.get("room")) roomEl.value = params.get("room").toUpperCase();
 
-      const proto = location.protocol === "https:" ? "wss:" : "ws:";
-      let pc, stream, ws, raf;
+      const peerIdFor = (room) => "chasebooth-" + String(room).trim().toLowerCase();
 
       const level = (s) => {
         const ctx = new AudioContext();
@@ -73,14 +91,20 @@
           for (const v of buf) sum += v * v;
           const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
           bar.style.width = Math.max(0, Math.min(1, (db + 60) / 60)) * 100 + "%";
-          raf = requestAnimationFrame(tick);
+          requestAnimationFrame(tick);
         };
         tick();
       };
 
       const start = async () => {
+        const room = roomEl.value.trim().toUpperCase();
+        if (!/^[A-Z0-9]{5}$/.test(room)) {
+          say("Type the 5-character code shown on the computer.", "err");
+          return;
+        }
         go.disabled = true;
         say("Asking for the microphone…");
+        let stream;
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -88,44 +112,32 @@
           });
         } catch (e) {
           go.disabled = false;
-          say("Microphone blocked: " + e.message + " If Safari warned about the certificate, tap Show Details and visit the site, then try again.", "err");
+          say("Microphone blocked: " + e.message, "err");
           return;
         }
         level(stream);
-        ws = new WebSocket(proto + "//" + location.host + "/ws");
-        pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-        pc.onicecandidate = (e) => {
-          if (e.candidate) ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
-        };
-        ws.onopen = () => {
-          ws.send(JSON.stringify({ role: "phone" }));
-        };
-        const sendOffer = async () => {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          ws.send(JSON.stringify({ type: "offer", sdp: pc.localDescription }));
-          say("Connecting to the desktop…");
-        };
-        ws.onmessage = async (ev) => {
-          const msg = JSON.parse(ev.data);
-          if (msg.type === "booth-ready") {
-            await sendOffer();
-          } else if (msg.type === "answer" && msg.sdp) {
-            await pc.setRemoteDescription(msg.sdp);
-            say("Live — leave this page open. Desktop camera is unchanged.", "live");
-            go.textContent = "Mic is live";
-            go.classList.add("off");
-          } else if (msg.type === "ice" && msg.candidate) {
-            try { await pc.addIceCandidate(msg.candidate); } catch {}
-          } else if (msg.type === "need-booth") {
-            say("On the computer: Setup → Microphone → Phone (desktop camera stays here).", "wait");
+        say("Connecting to the booth…");
+        const peer = new Peer();
+        peer.on("error", (err) => {
+          go.disabled = false;
+          say("Could not reach the booth (" + err.type + "). On the computer, set Microphone to Phone and keep that page open.", "err");
+        });
+        peer.on("open", () => {
+          const call = peer.call(peerIdFor(room), stream);
+          if (!call) {
+            go.disabled = false;
+            say("No booth with that code. Select Phone on the computer, then try again.", "err");
+            return;
           }
-        };
-        ws.onclose = () => say("Disconnected. Tap to reconnect.", "err");
-        ws.onerror = () => say("Could not reach the computer. Same Wi‑Fi, and allow the booth through Windows Firewall.", "err");
+          call.on("stream", () => {});
+          call.on("error", (err) => say("Call failed: " + err, "err"));
+          say("Live — leave this page open. Desktop camera is unchanged.", "live");
+          go.textContent = "Mic is live";
+          go.classList.add("off");
+        });
       };
       go.onclick = start;
+      if (roomEl.value) say("Code " + roomEl.value + " is in the link. Tap the button, then Allow microphone.");
     </script>
   </body>
 </html>

@@ -87,14 +87,7 @@ fs.writeFileSync(
   path.join(outDir, "index.html"),
   html("Recording Booth", `<div id="root"></div>\n    <script type="module" src="dist/app.js"></script>`),
 );
-const micSrc = fs.readFileSync(path.join(root, "booth", "mic.html"), "utf8");
-fs.writeFileSync(
-  path.join(outDir, "mic.html"),
-  micSrc.replace("<head>", `<head>\n    <base href="${base}" />`).replace(
-    'src="/dist/',
-    'src="dist/',
-  ),
-);
+fs.copyFileSync(path.join(root, "booth", "mic.html"), path.join(outDir, "mic.html"));
 
 copyDir(path.join(root, "public"), outDir);
 const brandDir = path.join(outDir, "brand");

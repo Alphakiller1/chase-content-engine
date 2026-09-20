@@ -132,7 +132,8 @@ From an existing Windows checkout, update and launch the current booth in one st
 
 Graphics come from the live chase-analytics.com slate plus the hosted nfl-model board
 (research only: a gap is a disagreement, not an edge). Takes land in `video/footage/`.
-Phone mic: HTTPS on port 8791 (`/mic`); desktop camera stays on the booth page.
+Phone mic: on the booth choose **Microphone → Phone**, then open the HTTPS audio
+link (or scan the QR) on your phone. The camera stays on the computer.
 
 ### Hosted booth (any computer)
 
@@ -141,9 +142,10 @@ workflow) and open:
 
 **https://alphakiller1.github.io/chase-content-engine/**
 
-Use that URL on another machine: camera and mic stay on that computer, graphics
-update from the repo, and a take downloads as a `.webm`. Phone-as-mic and
-“Make my video” still need a local `booth.bat` checkout.
+Use that URL on another machine: camera stays on that computer. For phone audio,
+choose **Microphone → Phone** and open the HTTPS link (or QR) on your phone. A
+take downloads as a `.webm`. **Make my video** still needs a local `booth.bat`
+checkout.
 
 Packs rebuild from the live NFL slate on each deploy (about every six hours, and
 on every push to `main`).

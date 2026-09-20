@@ -16,6 +16,7 @@ import { teamAccent } from "../src/teams";
 import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
+import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -181,7 +182,8 @@ const App: React.FC = () => {
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const [phoneTrack, setPhoneTrack] = useState<MediaStreamTrack | null>(null);
   const [phoneState, setPhoneState] = useState<"off" | "wait" | "live">("off");
-  const [phoneUrls, setPhoneUrls] = useState<string[]>([]);
+  const room = useMemo(() => boothRoom(), []);
+  const phoneHref = micUrl(room);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [count, setCount] = useState(0);
@@ -428,67 +430,49 @@ const App: React.FC = () => {
   }, [camStream, phoneTrack, micId]);
 
   useEffect(() => {
-    if (STATIC) return;
-    fetch("/api/lan")
-      .then((r) => (r.ok ? r.json() : { urls: [] }))
-      .then((d: { urls?: string[] }) => setPhoneUrls(d.urls ?? []))
-      .catch(() => setPhoneUrls([]));
-  }, []);
-
-  useEffect(() => {
-    if (STATIC || micId !== "phone") {
+    if (micId !== "phone") {
       setPhoneTrack(null);
       setPhoneState("off");
       return;
     }
     setPhoneState("wait");
-    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-    pc.ontrack = (e) => {
-      const t = e.track ?? e.streams[0]?.getAudioTracks()[0];
-      if (!t) return;
-      setPhoneTrack(t);
-      setPhoneState("live");
-      say("Phone mic is live — desktop camera unchanged");
-    };
-    pc.onicecandidate = (e) => {
-      if (e.candidate && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
-    };
-    const pendingIce: RTCIceCandidateInit[] = [];
-    ws.onopen = () => ws.send(JSON.stringify({ role: "booth" }));
-    ws.onmessage = async (ev) => {
-      const msg = JSON.parse(String(ev.data));
-      if (msg.type === "offer" && msg.sdp) {
-        await pc.setRemoteDescription(msg.sdp);
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ws.send(JSON.stringify({ type: "answer", sdp: pc.localDescription }));
-        for (const c of pendingIce) {
-          try {
-            await pc.addIceCandidate(c);
-          } catch {
-            /* stale */
-          }
-        }
-        pendingIce.length = 0;
-      } else if (msg.type === "ice" && msg.candidate) {
-        if (!pc.remoteDescription) pendingIce.push(msg.candidate);
-        else {
-          try {
-            await pc.addIceCandidate(msg.candidate);
-          } catch {
-            /* stale */
-          }
-        }
-      }
-    };
+    let peer: { destroy: () => void } | null = null;
+    let callRef: { close: () => void } | null = null;
+    let cancelled = false;
+    import("peerjs").then(({ default: Peer }) => {
+      if (cancelled) return;
+      peer = new Peer(peerIdFor(room), {
+        config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
+      });
+      peer.on("open", () => say("Phone link ready — scan or open it on your phone"));
+      peer.on("error", (err) => {
+        if (err.type === "unavailable-id") say("Audio room busy — reload the booth and try again");
+        else say("Phone link error: " + err.type);
+      });
+      peer.on("call", (call) => {
+        call.answer();
+        callRef = call;
+        call.on("stream", (remote) => {
+          const t = remote.getAudioTracks()[0];
+          if (!t) return;
+          setPhoneTrack(t);
+          setPhoneState("live");
+          say("Phone mic is live — desktop camera unchanged");
+        });
+        call.on("close", () => {
+          setPhoneTrack(null);
+          setPhoneState("wait");
+        });
+      });
+    });
     return () => {
-      pc.close();
-      ws.close();
+      cancelled = true;
+      callRef?.close();
+      peer?.destroy();
       setPhoneTrack(null);
       setPhoneState("off");
     };
-  }, [micId, say]);
+  }, [micId, room, say]);
 
   useEffect(() => {
     if (videoRef.current && stream) videoRef.current.srcObject = stream;
@@ -1429,7 +1413,7 @@ const App: React.FC = () => {
               }}
             >
               <option value="">Default (this computer)</option>
-              {STATIC ? null : <option value="phone">Phone (desktop camera stays here)</option>}
+              <option value="phone">Phone (desktop camera stays here)</option>
               {mics.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
                   {d.label || "Microphone"}
@@ -1438,25 +1422,34 @@ const App: React.FC = () => {
             </select>
           </label>
           {micId === "phone" ? (
-            <div className="hint" style={{ marginTop: 8 }}>
+            <div className="hint" style={{ marginTop: 12 }}>
               {phoneState === "live" ? (
                 <b style={{ color: "var(--mark-positive)" }}>Phone mic live.</b>
               ) : (
                 <b style={{ color: "var(--text-accent)" }}>Waiting for the phone.</b>
-              )}{" "}
-              Same Wi‑Fi. On the phone open{" "}
-              {phoneUrls[0] ? (
-                <button
-                  className="link"
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(phoneUrls[0])}
-                >
-                  {phoneUrls[0]}
-                </button>
-              ) : (
-                "the Phone mic URL from the booth terminal"
               )}
-              , tap past the certificate warning, then Allow microphone. Leave that page open.
+              <div style={{ marginTop: 10 }}>
+                On your phone open this HTTPS link (or scan). Code <code>{room}</code>
+              </div>
+              <button
+                className="link"
+                type="button"
+                style={{ display: "block", marginTop: 8, wordBreak: "break-all" }}
+                onClick={() => {
+                  navigator.clipboard.writeText(phoneHref);
+                  say("Audio link copied");
+                }}
+              >
+                {phoneHref}
+              </button>
+              <img
+                alt="QR code for the phone mic link"
+                src={qrUrl(phoneHref)}
+                width={160}
+                height={160}
+                style={{ display: "block", marginTop: 12, borderRadius: 8, background: "#fff" }}
+              />
+              <div style={{ marginTop: 8 }}>Tap Allow microphone and leave that page open. Desktop camera stays here.</div>
             </div>
           ) : null}
           <label className="check">
