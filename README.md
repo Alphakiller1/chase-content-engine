@@ -110,6 +110,14 @@ chase-content booth --sport nfl --games IND@KC --show "Week 3 Sunday Night Footb
 .\booth.bat
 ```
 
+From an existing Windows checkout, update and launch the current booth in one step:
+
+```powershell
+.\update-booth.bat
+```
+
+`booth.bat` now installs the video dependencies automatically on its first launch.
+
 Graphics come from the live chase-analytics.com slate plus the hosted nfl-model board
 (research only: a gap is a disagreement, not an edge). Takes land in `video/footage/`.
 Phone mic: HTTPS on port 8791 (`/mic`); desktop camera stays on the booth page.
