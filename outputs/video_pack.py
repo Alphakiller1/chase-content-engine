@@ -47,6 +47,8 @@ from outputs.content_engine import (
 from outputs.last_game import last_game_items
 from outputs.live_lines import game_odds, player_props
 from outputs.video_studio import (
+    clash_items,
+    cover_heat_items,
     formation_items,
     line_move_item,
     metric_items,
@@ -384,6 +386,8 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
         items.append(qb_card)
     items += skill_duel_items(a, g)
     items += scheme_diagram_items(a, g)
+    items += clash_items(a, g, qa, qh)
+    items += cover_heat_items(a, g)
     items += injury_items(a, g)
     items += formation_items(a, g) + player_items(a, g, qbs, props_by_player) + metric_items(a, g)
     try:

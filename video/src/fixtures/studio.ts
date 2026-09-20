@@ -15,6 +15,8 @@ import type { QbMatchupProps } from "../studio/QbMatchup";
 import type { SchemeDiagramProps } from "../studio/SchemeDiagram";
 import type { MixTableProps } from "../studio/MixTable";
 import type { InjuryBoardProps } from "../studio/InjuryBoard";
+import type { ClashBoardProps } from "../studio/ClashBoard";
+import type { CoverHeatProps } from "../studio/CoverHeat";
 
 export const SAMPLE_FORMATION: FormationProps = {
   "league": "nfl",
@@ -641,5 +643,63 @@ export const SAMPLE_INJURY: InjuryBoardProps = {
     { name: "Ja'Sir Taylor", position: "CB", status: "Injured Reserve", detail: "undisclosed", headshot: null, starter: false, impact: 2, impactLabel: "Rotation" },
   ],
 };
+
+export const SAMPLE_CLASH: ClashBoardProps = {
+  league: "nfl",
+  away: "IND",
+  home: "KC",
+  offense: "IND",
+  defense: "KC",
+  offenseName: "Colts",
+  defenseName: "Chiefs",
+  eyebrow: "SNF · Pass vs run",
+  title: "When IND has the ball",
+  note: "Coverage charted from 2025; rates are 2026.",
+  lanes: [
+    {
+      id: "pass",
+      title: "Pass success rate",
+      hero: { value: 0.458, display: "45.8%", rank: 18, of: 32 },
+      heroLabel: "Pass success rate",
+      yards: { display: "229", label: "Jones proj. yds" },
+      offEpa: { value: 0.028, display: "+0.028", rank: 20, of: 32 },
+      defEpa: { value: 0.014, display: "+0.014", rank: 11, of: 32 },
+      context: { value: 0.309, display: "30.9%", rank: 5, of: 32 },
+      contextOpp: { value: 0.27, display: "27.0%", rank: 7, of: 32 },
+      contextLabel: "1st-down rate",
+    },
+    {
+      id: "run",
+      title: "Success rate",
+      hero: { value: 0.454, display: "45.4%", rank: 6, of: 32 },
+      heroLabel: "Success rate",
+      yards: null,
+      offEpa: { value: 0.053, display: "+0.053", rank: 4, of: 32 },
+      defEpa: { value: -0.078, display: "-0.078", rank: 5, of: 32 },
+      context: { value: 0.056, display: "5.6%", rank: 15, of: 32 },
+      contextOpp: { value: 0.05, display: "5.0%", rank: 7, of: 32 },
+      contextLabel: "explosive plays",
+    },
+  ],
+};
+
+export const SAMPLE_COVER: CoverHeatProps = {
+  league: "nfl",
+  away: "IND",
+  home: "KC",
+  offense: "IND",
+  defense: "KC",
+  offenseName: "Colts",
+  defenseName: "Chiefs",
+  eyebrow: "SNF · vs coverage",
+  title: "IND vs KC shells",
+  note: "How often KC plays each look, then how IND throws it vs what KC allows.",
+  shells: [
+    { label: "Cover 3", rate: "26.7%", rateValue: 0.267, rateRank: 8, off: { value: 0.06, display: "+0.057", rank: 11, of: 32 }, opp: { value: 0.12, display: "+0.120", rank: 22, of: 32 } },
+    { label: "Cover 1", rate: "25.3%", rateValue: 0.253, rateRank: 10, off: { value: 0.09, display: "+0.090", rank: 7, of: 32 }, opp: { value: 0.16, display: "+0.163", rank: 26, of: 32 } },
+    { label: "Cover 2", rate: "24.2%", rateValue: 0.242, rateRank: 6, off: { value: 0.08, display: "+0.077", rank: 9, of: 32 }, opp: { value: 0.00, display: "+0.005", rank: 8, of: 32 } },
+  ],
+};
+
 
 

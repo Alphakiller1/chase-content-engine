@@ -42,6 +42,8 @@ import { QbMatchup } from "../studio/QbMatchup";
 import { SchemeDiagram } from "../studio/SchemeDiagram";
 import { MixTable } from "../studio/MixTable";
 import { InjuryBoard } from "../studio/InjuryBoard";
+import { ClashBoard } from "../studio/ClashBoard";
+import { CoverHeat } from "../studio/CoverHeat";
 import "../fonts";
 
 /**
@@ -150,6 +152,10 @@ const GRAPHICS: Record<string, React.FC<any>> = {
   MixTableWide: MixTable,
   InjuryBoard,
   InjuryBoardWide: InjuryBoard,
+  ClashBoard,
+  ClashBoardWide: ClashBoard,
+  CoverHeat,
+  CoverHeatWide: CoverHeat,
   Ticker,
   CornerBug,
   LowerThird,

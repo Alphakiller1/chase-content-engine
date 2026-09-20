@@ -407,6 +407,9 @@ const RULES = [
   { key: "scheme-cover", keys: ["coverage", "man coverage", "zone", "cover 2", "cover 3", "cover 1", "two high", "single high"] },
   { key: "scheme-pressure", keys: ["blitz", "blitzes", "blitzing", "pressure", "pass rush", "stacked box"] },
   { key: "scheme-pack", keys: ["personnel", "eleven personnel", "12 personnel", "shotgun", "play action", "motion", "under center"] },
+  { key: "clash-away", keys: ["pass versus run", "pass vs run", "when they have the ball", "against the run", "against the pass", "vs the run", "vs the pass"] },
+  { key: "clash-home", keys: ["when the home team has the ball"] },
+  { key: "cover-away", keys: ["against coverage", "versus coverage", "vs coverage", "shells", "cover zero"] },
   { keys: ["last game", "last week", "last time out"], key: (sent) => {
       const home = sent.some((w) => homeTokens.includes(w));
       const away = sent.some((w) => awayTokens.includes(w));

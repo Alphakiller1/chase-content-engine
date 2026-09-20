@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import time
 from pathlib import Path
@@ -318,6 +319,240 @@ def scheme_diagram_items(a, g: dict) -> list[tuple[str, str, dict]]:
             "title": "How They Line Up",
             "awayLook": look("away", sa, "personnel"), "homeLook": look("home", sh, "personnel")}),
     ]
+
+
+def _scheme_unit(scheme: dict, unit: str, bucket: str) -> dict:
+    return ((scheme or {}).get(unit) or {}).get(bucket) or {}
+
+
+def _ord(n: int | None) -> str:
+    if not n:
+        return ""
+    v = n % 100
+    suf = "th" if 10 <= v <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suf}"
+
+
+def _z_rank(value, dist: dict | None, invert: bool = False) -> int | None:
+    """Approximate 1-32 rank from league mean/std. invert=True when low is better (defense EPA allowed)."""
+    if value is None or not isinstance(dist, dict):
+        return None
+    try:
+        mean, std = float(dist["mean"]), float(dist["std"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if std <= 0:
+        return None
+    z = (float(value) - mean) / std
+    p = 0.5 * (1 + math.erf(z / math.sqrt(2.0)))
+    if invert:
+        p = 1 - p
+    return max(1, min(32, int(round(1 + (1 - p) * 31))))
+
+
+def _cell(v) -> dict:
+    if v is None:
+        return {"value": None, "display": "—", "rank": None, "of": 32, "vsAvg": ""}
+    n = float(v)
+    return {"value": n, "display": _epa(n), "rank": None, "of": 32, "vsAvg": ""}
+
+
+def _epa_stat(value, dist: dict | None, invert: bool = False) -> dict:
+    cell = _cell(value)
+    cell["rank"] = _z_rank(value, dist, invert)
+    if value is not None and isinstance(dist, dict) and dist.get("mean") is not None:
+        gap = float(value) - float(dist["mean"])
+        cell["vsAvg"] = f"{gap:+.2f} vs NFL"
+    return cell
+
+
+def _rate_stat(value, dist: dict | None, invert: bool = False) -> dict:
+    if value is None:
+        return {"value": None, "display": "—", "rank": None, "of": 32, "vsAvg": ""}
+    n = float(value)
+    return {
+        "value": n,
+        "display": _pct(n),
+        "rank": _z_rank(n, dist, invert),
+        "of": 32,
+        "vsAvg": "",
+    }
+
+
+def _form_stat(g: dict, side: str, key: str) -> dict:
+    r = ((g.get(f"{side}_form") or {}).get("rates") or {}).get(key) or {}
+    if not r or r.get("value") is None:
+        return {"value": None, "display": "—", "rank": None, "of": 32, "label": ""}
+    fmt = _epa if "epa" in key else _pct
+    return {
+        "value": float(r["value"]),
+        "display": fmt(float(r["value"])),
+        "rank": r.get("rank"),
+        "of": r.get("of") or 32,
+        "label": r.get("label") or key,
+    }
+
+
+def _freq_rank(scheme: dict, unit: str, cat: str, key: str) -> int | None:
+    place = ((((scheme.get("league_frequency_ranks") or {}).get(unit) or {}).get(cat) or {}).get(key) or {}).get("place")
+    return int(place) if place else None
+
+
+def clash_items(a, g: dict, qa: dict | None = None, qh: dict | None = None) -> list[tuple[str, str, dict]]:
+    """One graphic per possession so pass/run can be read at broadcast size."""
+    sa, sh = g.get("away_scheme") or {}, g.get("home_scheme") or {}
+    if not sa or not sh:
+        return []
+    away, home = g["away"].upper(), g["home"].upper()
+    q_by_side = {"away": qa, "home": qh}
+
+    def possession(off_side: str, def_side: str) -> dict:
+        off_s = g.get(f"{off_side}_scheme") or {}
+        def_s = g.get(f"{def_side}_scheme") or {}
+        off_r = _scheme_unit(off_s, "offense", "response")
+        def_r = _scheme_unit(def_s, "defense", "response")
+        off_lg = (off_s.get("league_response") or {}).get("offense") or {}
+        def_lg = (def_s.get("league_response") or {}).get("defense") or {}
+        off_team = g[off_side].upper()
+        def_team = g[def_side].upper()
+        qb = q_by_side.get(off_side) or {}
+        yds = None
+        try:
+            yds = float((qb.get("metrics") or {}).get("passing_yards"))
+        except (TypeError, ValueError):
+            yds = None
+        qb_name = (qb.get("player_name") or "").split(" ")[-1]
+        return {
+            "title": f"When {off_team} has the ball",
+            "offense": off_team,
+            "defense": def_team,
+            "offenseName": g.get(f"{off_side}_name", off_team),
+            "defenseName": g.get(f"{def_side}_name", def_team),
+            "lanes": [
+                {
+                    "id": "pass",
+                    "title": "Pass success rate",
+                    "hero": _rate_stat(off_r.get("pass_success_rate"), off_lg.get("pass_success_rate")),
+                    "heroLabel": "Pass success rate",
+                    "yards": (
+                        {"display": f"{yds:.0f}", "label": f"{qb_name} proj. yds"} if yds else None
+                    ),
+                    "offEpa": _epa_stat(off_r.get("pass_epa"), off_lg.get("pass_epa")),
+                    "defEpa": _epa_stat(def_r.get("pass_epa"), def_lg.get("pass_epa"), invert=True),
+                    "context": _form_stat(g, off_side, "off_first_down"),
+                    "contextOpp": _form_stat(g, def_side, "def_first_down"),
+                    "contextLabel": "1st-down rate",
+                },
+                {
+                    "id": "run",
+                    "title": "Success rate",
+                    "hero": _rate_stat(off_r.get("rush_success_rate"), off_lg.get("rush_success_rate")),
+                    "heroLabel": "Success rate",
+                    "yards": None,
+                    "offEpa": _epa_stat(off_r.get("rush_epa"), off_lg.get("rush_epa")),
+                    "defEpa": _epa_stat(def_r.get("rush_epa"), def_lg.get("rush_epa"), invert=True),
+                    "context": _form_stat(g, off_side, "off_explosive"),
+                    "contextOpp": _form_stat(g, def_side, "def_explosive"),
+                    "contextLabel": "explosive plays",
+                },
+            ],
+        }
+
+    items = []
+    for off_side, def_side in (("away", "home"), ("home", "away")):
+        p = possession(off_side, def_side)
+        items.append((f"clash-{off_side}", "ClashBoard", {
+            "league": "nfl",
+            "away": away,
+            "home": home,
+            "offense": p["offense"],
+            "defense": p["defense"],
+            "offenseName": p["offenseName"],
+            "defenseName": p["defenseName"],
+            "eyebrow": f"{a.tag} · Pass vs run",
+            "title": p["title"],
+            "note": charting_note(g),
+            "lanes": p["lanes"],
+        }))
+    return items
+
+
+COVER_SHELLS = (
+    ("cover_0", "Cover 0"),
+    ("cover_1", "Cover 1"),
+    ("cover_2", "Cover 2"),
+    ("cover_3", "Cover 3"),
+    ("cover_4", "Cover 4"),
+    ("cover_6", "Cover 6"),
+    ("cover_2_man", "2-Man"),
+    ("man", "Man"),
+    ("zone", "Zone"),
+    ("blitz", "Vs blitz"),
+    ("pressure", "Vs pressure"),
+)
+
+
+def cover_heat_items(a, g: dict) -> list[tuple[str, str, dict]]:
+    """How often this defense plays each look, plus ranked pass quality in that look."""
+    items = []
+    for off_side, def_side in (("away", "home"), ("home", "away")):
+        off_s = g.get(f"{off_side}_scheme") or {}
+        def_s = g.get(f"{def_side}_scheme") or {}
+        off_r = _scheme_unit(off_s, "offense", "response")
+        def_r = _scheme_unit(def_s, "defense", "response")
+        def_c = _scheme_unit(def_s, "defense", "coverage")
+        def_p = _scheme_unit(def_s, "defense", "pressure")
+        off_lg = (off_s.get("league_response") or {}).get("offense") or {}
+        def_lg = (def_s.get("league_response") or {}).get("defense") or {}
+        shells = []
+        for key, label in COVER_SHELLS:
+            if key in ("blitz", "pressure"):
+                epa_key = f"pass_epa_{key}"
+                rate = def_p.get("blitz_rate" if key == "blitz" else "pressure_rate")
+                rate_key = "blitz_rate" if key == "blitz" else "pressure_rate"
+                rate_cat = "pressure"
+            elif key in ("man", "zone"):
+                epa_key = f"pass_epa_{key}"
+                rate = def_c.get(f"{key}_rate")
+                rate_key = f"{key}_rate"
+                rate_cat = "coverage"
+            else:
+                epa_key = f"pass_epa_{key}"
+                rate = def_c.get(f"{key}_rate")
+                rate_key = f"{key}_rate"
+                rate_cat = "coverage"
+            off_v = off_r.get(epa_key)
+            def_v = def_r.get(epa_key)
+            if off_v is None and def_v is None and rate is None:
+                continue
+            shells.append({
+                "label": label,
+                "rate": _pct(float(rate)) if rate is not None else "—",
+                "rateValue": float(rate) if rate is not None else None,
+                "rateRank": _freq_rank(def_s, "defense", rate_cat, rate_key),
+                "off": _epa_stat(off_v, off_lg.get(epa_key)),
+                "opp": _epa_stat(def_v, def_lg.get(epa_key), invert=True),
+            })
+        shells.sort(key=lambda s: -(s["rateValue"] or 0))
+        shells = [s for s in shells if (s["rateValue"] or 0) >= 0.04 or s["label"] in ("Vs blitz", "Man", "Zone")][:7]
+        if len(shells) < 4:
+            continue
+        off_team = g[off_side].upper()
+        def_team = g[def_side].upper()
+        items.append((f"cover-{off_side}", "CoverHeat", {
+            "league": "nfl",
+            "away": g["away"].upper(),
+            "home": g["home"].upper(),
+            "offense": off_team,
+            "defense": def_team,
+            "offenseName": g.get(f"{off_side}_name", off_team),
+            "defenseName": g.get(f"{def_side}_name", def_team),
+            "eyebrow": f"{a.tag} · vs coverage",
+            "title": f"{off_team} vs {def_team} shells",
+            "note": f"Team rates, not one QB. {charting_note(g)}",
+            "shells": shells,
+        }))
+    return items
 
 
 def _num(d: dict, *keys):

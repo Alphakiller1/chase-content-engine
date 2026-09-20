@@ -31,7 +31,7 @@ export const SECTION = {
   qb: "Players", formation: "Players", injuries: "Players", players: "Players",
 };
 /** Compositions with a registered 16:9 twin named <id>Wide. */
-const HAS_WIDE = new Set(["StatDuel", "LineGap", "RankCountdown", "Formation", "PlayerCard", "MetricBoard", "BoardMotion", "LineMove", "PropBoard", "LastGame", "TeamCompare", "QbMatchup", "SchemeDiagram", "MixTable", "InjuryBoard"]);
+const HAS_WIDE = new Set(["StatDuel", "LineGap", "RankCountdown", "Formation", "PlayerCard", "MetricBoard", "BoardMotion", "LineMove", "PropBoard", "LastGame", "TeamCompare", "QbMatchup", "SchemeDiagram", "MixTable", "InjuryBoard", "ClashBoard", "CoverHeat"]);
 
 export function loadPack(packDir) {
   const manifest = JSON.parse(fs.readFileSync(path.join(packDir, "pack.json"), "utf8"));
@@ -133,6 +133,18 @@ export function loadPack(packDir) {
       item("scheme-cover") ? `${item("scheme-cover").props.awayLook?.shell} vs ${item("scheme-cover").props.homeLook?.shell}` : "");
     add("scheme", "Scheme", "scheme-pack", "Personnel", "scheme-pack",
       item("scheme-pack") ? "11 / 12 / 21 packages illustrated" : "");
+    add("scheme", "Scheme", "clash-away", `${game.away} with the ball`, "clash-away",
+      item("clash-away")
+        ? "Success rate % and NFL rank, plus pass success rate. Then EPA vs what the defense allows."
+        : "");
+    add("scheme", "Scheme", "clash-home", `${game.home} with the ball`, "clash-home",
+      item("clash-home")
+        ? "Success rate % and NFL rank, plus pass success rate. Then EPA vs what the defense allows."
+        : "");
+    add("scheme", "Scheme", "cover-away", `${game.away} vs ${game.home} shells`, "cover-away",
+      item("cover-away")?.props.note || "");
+    add("scheme", "Scheme", "cover-home", `${game.home} vs ${game.away} shells`, "cover-home",
+      item("cover-home")?.props.note || "");
     add("scheme", "Scheme", "scheme-pressure", "Pressure", "stats-pressure", boardNote("stats-pressure"));
     add("scheme", "Scheme", "scheme-targets", "Targets", "stats-targets", boardNote("stats-targets"));
     const ranks = item("ranks");
