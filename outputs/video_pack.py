@@ -510,6 +510,8 @@ def main() -> None:
     ap.add_argument("--refresh", metavar="PACK_DIR",
                     help="re-read live lines and data for an existing pack, with the settings it was "
                          "built with; its injury-board captures are kept (fast: no browser)")
+    ap.add_argument("--all", action="store_true",
+                    help="build a pack for every game on the live slate (used by the hosted booth deploy)")
     argv = sys.argv[1:]
     a = ap.parse_args(argv)
     reuse: list[tuple[str, str, dict]] = []
@@ -525,8 +527,30 @@ def main() -> None:
             if it["composition"] == "Annotate":
                 reuse.append((it["name"], it["composition"],
                               json.loads((old_dir / it["props"]).read_text(encoding="utf-8"))))
+    if a.all:
+        if not a.league:
+            ap.error("--league is required with --all")
+        board = json.loads(_fetch(f"{SITE_URL}/data/public/{a.league}/slate.json"))
+        games = board.get("games") or []
+        if not games:
+            fail(f"live {a.league} slate has no games")
+        for g in games:
+            token = f"{g['away']}@{g['home']}"
+            cmd = [sys.executable, "-m", "outputs.video_pack", "--league", a.league, "--game", token,
+                   "--platform", a.platform]
+            if a.date:
+                cmd += ["--date", a.date]
+            if a.show:
+                cmd += ["--show", a.show]
+            if a.tag:
+                cmd += ["--tag", a.tag]
+            print(f"[video-pack] slate {token}")
+            r = subprocess.run(cmd, cwd=str(PIPELINE))
+            if r.returncode != 0:
+                print(f"[video-pack] skip {token} (exit {r.returncode})")
+        return
     if not a.league or not a.game:
-        ap.error("--league and --game are required (or --refresh PACK_DIR)")
+        ap.error("--league and --game are required (or --refresh PACK_DIR, or --all)")
     if not a.tag:
         a.tag = "".join(w[0] for w in (a.show or "").split()).upper() or a.league.upper()
 

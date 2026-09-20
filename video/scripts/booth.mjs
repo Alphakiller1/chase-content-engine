@@ -90,7 +90,7 @@ await build({
   // package.json marks only *.css as side-effectful (for Remotion's bundler); the
   // components' bare `import "../fonts"` must still be kept here.
   ignoreAnnotations: true,
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: { "process.env.NODE_ENV": '"production"', "process.env.BOOTH_STATIC": '"0"', "process.env.BOOTH_BASE": '""' },
   loader: { ".woff2": "file", ".woff": "file", ".ttf": "file", ".png": "file", ".svg": "file" },
 });
 

@@ -15,6 +15,7 @@ import { LAYOUT_MODES, LayoutMode, StageSize, Stroke, frameGeom } from "../src/e
 import { teamAccent } from "../src/teams";
 import "../src/theme.css";
 import "./booth.css";
+import { STATIC, downloadBlob, url } from "./host";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -248,15 +249,18 @@ const App: React.FC = () => {
 
   /* catalog */
   useEffect(() => {
-    fetch("/api/packs")
+    const packsUrl = STATIC ? url("/data/packs.json") : "/api/packs";
+    fetch(packsUrl)
       .then((r) => (r.ok ? r.json() : { packs: [] }))
-      .then((d: { packs?: PackOpt[] }) => setPacks(d.packs ?? []))
-      .catch(() => setPacks([]));
-    fetch("/api/catalog")
-      .then((r) => (r.ok ? r.json() : r.text().then((t) => Promise.reject(new Error(t)))))
-      .then((c: Catalog) => {
+      .then(async (d: { packs?: PackOpt[]; current?: string }) => {
+        const list = d.packs ?? [];
+        setPacks(list);
+        const current = d.current || list.find((p) => p.active)?.id || list[0]?.id;
+        const catUrl = STATIC && current ? url(`/data/packs/${current}/catalog.json`) : "/api/catalog";
+        const r = await fetch(catUrl);
+        if (!r.ok) throw new Error(await r.text());
+        const c: Catalog = await r.json();
         setCat(c);
-        // Warm the browser cache so a board or a face appears the moment it is called.
         for (const e of [...c.formats.vertical, ...c.formats.wide]) {
           const p = e.props as {
             capture?: { src?: string }; headshot?: string;
@@ -269,15 +273,16 @@ const App: React.FC = () => {
             ...(p.rows ?? []).map((x) => x.headshot),
           ];
           for (const src of srcs) {
-            if (src) new Image().src = "/" + src;
+            if (src) new Image().src = (src.startsWith("http") ? src : url("/" + src.replace(/^\//, "")));
           }
         }
       })
-      .catch((e) => setLoadError(String(e.message ?? e)));
+      .catch((e) => setLoadError(String((e as Error).message ?? e)));
   }, []);
 
   /* live lines: follow the server's refreshes and reload the graphics when they land */
   useEffect(() => {
+    if (STATIC) return;
     let alive = true;
     const poll = async () => {
       try {
@@ -423,6 +428,7 @@ const App: React.FC = () => {
   }, [camStream, phoneTrack, micId]);
 
   useEffect(() => {
+    if (STATIC) return;
     fetch("/api/lan")
       .then((r) => (r.ok ? r.json() : { urls: [] }))
       .then((d: { urls?: string[] }) => setPhoneUrls(d.urls ?? []))
@@ -430,7 +436,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (micId !== "phone") {
+    if (STATIC || micId !== "phone") {
       setPhoneTrack(null);
       setPhoneState("off");
       return;
@@ -728,6 +734,14 @@ const App: React.FC = () => {
       const name = stamp();
       try {
         const blob = new Blob(chunks.current, { type: "video/webm" });
+        if (STATIC) {
+          downloadBlob(`${name}.webm`, blob, "video/webm");
+          downloadBlob(`${name}.cues.json`, JSON.stringify({ cues: cuesRef.current, strokes: strokeStore.current }, null, 2), "application/json");
+          setSaved(name);
+          setPhase("saved");
+          setMessage("Take downloaded on this computer. Auto-edit still runs from a local booth checkout.");
+          return;
+        }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
         if (!r.ok) throw new Error(await r.text());
         r = await fetch(`/api/cues?name=${name}`, {
@@ -1103,6 +1117,14 @@ const App: React.FC = () => {
               aria-label="Select game pack"
               onChange={async (e) => {
                 const id = e.target.value;
+                if (STATIC) {
+                  const c: Catalog = await (await fetch(url(`/data/packs/${id}/catalog.json`), { cache: "no-store" })).json();
+                  setCat(c);
+                  setCurrentKey("matchup");
+                  setPacks((ps) => ps.map((p) => ({ ...p, active: p.id === id })));
+                  say(`Loaded ${c.title}`);
+                  return;
+                }
                 await fetch("/api/pack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
                 const c: Catalog = await (await fetch("/api/catalog", { cache: "no-store" })).json();
                 setCat(c);
@@ -1127,7 +1149,9 @@ const App: React.FC = () => {
             <span className={live?.busy ? "live-dot busy" : live?.error ? "live-dot err" : "live-dot"} />
             <b>{cat.line || "No line posted"}</b>
             <span className="muted">
-              {live?.busy
+              {STATIC
+                ? "hosted · graphics refresh when main is pushed"
+                : live?.busy
                 ? "refreshing..."
                 : live?.error
                   ? "refresh failed - showing last lines"
@@ -1135,6 +1159,7 @@ const App: React.FC = () => {
                     ? `live · ${new Date(live.updated).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })} · every ${live.everyMin} min`
                     : "live"}
             </span>
+            {STATIC ? null : (
             <button
               className="link"
               onClick={() => {
@@ -1144,6 +1169,7 @@ const App: React.FC = () => {
             >
               refresh
             </button>
+            )}
           </div>
         </header>
 
@@ -1168,11 +1194,13 @@ const App: React.FC = () => {
           {phase === "saved" ? (
             <div className="saved">
               <div>
-                Saved <b>{saved}</b> in video\footage
+                {STATIC ? <>Downloaded <b>{saved}.webm</b> to this computer</> : <>Saved <b>{saved}</b> in video\footage</>}
               </div>
+              {STATIC ? null : (
               <button className="big go" onClick={makeVideo}>
                 Make my video
               </button>
+              )}
             </div>
           ) : null}
           {message ? <div className={phase === "error" ? "error" : "hint"}>{message}</div> : null}
@@ -1401,7 +1429,7 @@ const App: React.FC = () => {
               }}
             >
               <option value="">Default (this computer)</option>
-              <option value="phone">Phone (desktop camera stays here)</option>
+              {STATIC ? null : <option value="phone">Phone (desktop camera stays here)</option>}
               {mics.map((d) => (
                 <option key={d.deviceId} value={d.deviceId}>
                   {d.label || "Microphone"}

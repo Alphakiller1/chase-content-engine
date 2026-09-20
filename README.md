@@ -122,3 +122,17 @@ Graphics come from the live chase-analytics.com slate plus the hosted nfl-model 
 (research only: a gap is a disagreement, not an edge). Takes land in `video/footage/`.
 Phone mic: HTTPS on port 8791 (`/mic`); desktop camera stays on the booth page.
 
+### Hosted booth (any computer)
+
+The studio is also on GitHub Pages. Push to `main` (or run the **deploy-booth**
+workflow) and open:
+
+**https://alphakiller1.github.io/chase-content-engine/**
+
+Use that URL on another machine: camera and mic stay on that computer, graphics
+update from the repo, and a take downloads as a `.webm`. Phone-as-mic and
+“Make my video” still need a local `booth.bat` checkout.
+
+Packs rebuild from the live NFL slate on each deploy (about every six hours, and
+on every push to `main`).
+

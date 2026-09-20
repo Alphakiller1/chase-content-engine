@@ -10,5 +10,6 @@ data/current/
 .cache/
 video/node_modules/
 video/out/
-video/footage/
+video/booth/dist/
+video/booth/site/
 video/props/

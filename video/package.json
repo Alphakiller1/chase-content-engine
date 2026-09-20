@@ -37,7 +37,8 @@
     "sync-style": "cd .. && python -m outputs.content_engine sync-style",
     "predev": "npm run sync-style",
     "snap": "node scripts/snap.mjs",
-    "snap:all": "node scripts/snap.mjs --all"
+    "snap:all": "node scripts/snap.mjs --all",
+    "export-booth": "node scripts/export-booth.mjs"
   },
   "sideEffects": [
     "*.css"
