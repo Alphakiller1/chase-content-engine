@@ -102,6 +102,18 @@ See [docs/MIGRATION.md](docs/MIGRATION.md) for the upstream contract and cutover
 
 The studio and Remotion graphics follow the shared [Broadcast Design System](docs/BROADCAST_DESIGN_SYSTEM.md).
 
+### Windows desktop install or repair
+
+Run this in PowerShell. It does not depend on an existing checkout or the old portable installer:
+
+```powershell
+$p=Join-Path $env:TEMP 'Install-ChaseBooth.ps1'; Invoke-WebRequest 'https://raw.githubusercontent.com/Alphakiller1/chase-content-engine/main/install-broadcast-booth.ps1' -OutFile $p; powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -NoExit -File $p
+```
+
+The installer downloads the current studio, creates an isolated Python environment,
+installs Remotion, builds the selected NFL game packs, creates `Broadcast Booth.cmd`
+on the desktop, and replaces the terminal `booth` alias with the current studio.
+
 Permanent video path for this repo. After `npm install` in `video/`:
 
 ```powershell
