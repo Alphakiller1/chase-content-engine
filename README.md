@@ -9,8 +9,8 @@ The repository has three upstream responsibilities:
 - **Sharp Money Tracker / MLB Model Markets** — public-versus-sharp probabilities.
 
 The content engine owns migration, validation, personal-opinion overlays, pagination,
-and branded PNG generation. It does not scrape baseball data or calculate betting
-signals independently.
+and branded PNG generation. It also owns the **recording booth**: live Remotion
+graphics, desktop camera, optional phone mic, one take.
 
 The operating cadence is versioned in
 [`content_plan/daily_schedule.json`](content_plan/daily_schedule.json), and each graphic's
@@ -97,3 +97,18 @@ probabilities, or carries stale market observations. A human still approves ever
 before upload.
 
 See [docs/MIGRATION.md](docs/MIGRATION.md) for the upstream contract and cutover plan.
+
+## Recording booth
+
+Permanent video path for this repo. After `npm install` in `video/`:
+
+```powershell
+chase-content booth --sport nfl --games IND@KC --show "Week 3 Sunday Night Football"
+.\content.bat booth --sport nfl --games IND@KC
+.\booth.bat
+```
+
+Graphics come from the live chase-analytics.com slate plus the hosted nfl-model board
+(research only: a gap is a disagreement, not an edge). Takes land in `video/footage/`.
+Phone mic: HTTPS on port 8791 (`/mic`); desktop camera stays on the booth page.
+

@@ -1,0 +1,60 @@
+/* The live chase-analytics.com design is the contract for the video package, the
+   same as for the still posts (docs/CONTENT_ENGINE_SPEC.md section 1).
+
+   ./site/ is exported from production by
+       python -m outputs.content_engine sync-style
+   (every content_engine run refreshes it too): the site's brand faces and its token
+   + semantic sheets, nothing else. If the import below fails to resolve, run that
+   command. Do NOT copy token values into this file or into a component - name the
+   semantic tokens (--surface-*, --text-*, --accent*, --border-*, --font-*) and the
+   next site restyle reaches every video without an edit here.
+
+   Replaced 2026-09-17: this file used to import the branch's legacy theme.css and
+   mlbma_design_system.css, which kept the videos on the July violet/DM Sans desk after
+   the site moved to the black surface and Archivo. */
+@import "./site/index.css";
+
+/* Overlays must keep a real alpha channel for Resolve, so the page stays
+   transparent; a composition that wants a ground paints its own. */
+html,
+body {
+  background: transparent !important;
+  margin: 0;
+}
+
+/* Titles: solid paper ink. Metal clip-to-text goes muddy when the 1080 frame
+   is scaled in the booth or compressed for Reels. */
+.chrome,
+.chrome-violet {
+  color: var(--text-primary);
+  -webkit-text-fill-color: var(--text-primary);
+  background: none;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.8), 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+/* Tabular figures everywhere numbers animate, so a ticking count does not jitter
+   sideways as its digits change width. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+}
+
+/* Video type scale. The site is read at arm's length on a desktop; a Reel is read on
+   a phone and a long-form video from a sofa, so everything steps up. Roles, not
+   sizes: components pick the role. */
+:root {
+  --vid-hook: 112px;
+  --vid-headline: 132px;
+  --vid-title: 96px;
+  --vid-label: 34px;
+  --vid-stat: 96px;
+  --vid-body: 42px;
+  --vid-take: 48px;
+  --vid-caps-track: 0.04em;
+
+  /* The site's own surface for a video card: the card ink at a small transparency
+     so it still sits over footage. Derived from tokens, not a new colour. */
+  --vid-glass: color-mix(in srgb, var(--surface-card) 96%, transparent);
+  --vid-glass-strong: color-mix(in srgb, var(--surface-page) 94%, transparent);
+}

@@ -1,0 +1,267 @@
+/*
+ * L2 — semantic role tokens.
+ * DESIGN_LAYER_VERSION is stamped on the HTML <link>, not here.
+ *
+ * This is the only file under dashboard/styles/ that may reference TIER 1
+ * primitives (--ca-*). Components, patterns, and the shell consume these
+ * roles — never --ca-ink-* / --ca-violet-* / --ca-paper-* directly.
+ *
+ * Role families (architecture v2 §4 L2, aligned with contract §5.2 / WP1-A2):
+ *   surface, text, border, accent, mark, value, metric, status,
+ *   control, focus, font, type, space, radius, elevation, motion, shell.
+ */
+:root {
+  /* —— Surface —— */
+  --surface-canvas: var(--ca-ink-950);
+  --surface-page: var(--ca-ink-950);
+  --surface-inset: var(--ca-ink-900);
+  --surface-panel: var(--ca-ink-850);
+  --surface-elevated: var(--ca-ink-800);
+  --surface-raised: var(--ca-ink-750);
+  --surface-overlay: var(--ca-black-a-60);
+  --surface-header: var(--ca-ink-950);
+  --surface-inverse: var(--ca-paper-50);
+  --surface-1: var(--ca-ink-850);
+  --surface-2: var(--ca-ink-800);
+  --surface-3: var(--ca-ink-750);
+
+  /* Board fills are FLAT (2026-09-10). The reference renderings are a matte
+     near-black desk: colour comes from team identity, status and data, never
+     from ambient washes or lacquer on the chrome. These were gradients; the
+     result read as generic and fought the crisp panel edges the renderings
+     rely on. Kept as roles (not raw inks) so a future skin can swap them. */
+  --surface-board: var(--ca-ink-900);
+  --surface-board-raised: var(--ca-ink-850);
+  --surface-field: var(--ca-ink-800);
+  --canvas-ambient: none;
+
+  /* Black premium surface (2026-09-15). One lifted black per object with a
+     hairline of top light; nothing inside it draws a frame of its own.
+     A well is the recess inside a slab - a panel within a section. */
+  --surface-card: var(--ca-ink-850);
+  --surface-well: var(--ca-ink-900);
+  --border-card: var(--ca-white-a-045);
+  --border-hover: var(--ca-white-a-12);
+  --elevation-card: inset 0 1px 0 var(--ca-white-a-03);
+
+  /* —— Text —— */
+  --text-primary: var(--ca-paper-50);
+  --text-secondary: var(--ca-paper-400);
+  --text-meta: var(--ca-paper-400);
+  /* Was --ca-paper-500 (#6E7383), which measured 3.89–4.02:1 on the card and
+     canvas grounds — under AA everywhere it appeared. --ca-paper-400 clears
+     4.5:1 on both --ca-ink-850 and --ca-ink-1000. */
+  --text-muted: var(--ca-paper-400);
+  --text-disabled: var(--ca-paper-600);
+  --text-accent: var(--ca-violet-300);
+  --text-on-accent: var(--ca-paper-50);
+  --text-inverse: var(--ca-ink-950);
+
+  /* —— Border —— */
+  --border-default: var(--ca-line-600);
+  --border-strong: var(--ca-line-500);
+  --border-subtle: var(--ca-white-a-045);
+  --border-accent: var(--ca-violet-a-32);
+  --border-focus: var(--ca-violet-500);
+  --border-inverse: var(--ca-light-line);
+
+  /* —— Accent (violet brand; never a metric) —— */
+  --accent: var(--ca-violet-500);
+  --accent-soft: var(--ca-violet-a-11);
+  --accent-strong: var(--ca-violet-700);
+  --accent-text: var(--ca-violet-300);
+  --accent-glow: var(--ca-violet-a-32);
+
+  /* Model Center's surfaces. Two products, two design layers: the public desk
+     is near-black with violet held back for navigation, and Model Center is
+     the entitled product, carrying the brand into the surface itself. Named
+     here so the route layer never reaches for a primitive. */
+  --surface-mc-page: var(--ca-mc-900);
+  --surface-mc-panel: var(--ca-mc-850);
+  --surface-mc-raised: var(--ca-mc-800);
+  --surface-mc-field: var(--ca-violet-deep-900);
+  --surface-mc-hover: var(--ca-violet-deep-800);
+
+  /* Distribution segments. A stacked bar needs a set of hues that stay
+     distinguishable in both themes and never read as good-to-bad, because the
+     segments are categories - coverage shells, target shares - not a scale. */
+  --series-1: var(--ca-violet-500);
+  --series-2: var(--ca-violet-300);
+  --series-3: var(--ca-teal-400);
+  --series-4: var(--ca-amber-400);
+  --series-5: var(--ca-violet-700);
+  --series-6: var(--ca-blue-300);
+  --series-7: var(--ca-red-400);
+  /* Board chrome: the 3px brand edge and the top-edge glint that reads as the
+     light source. Roles, so L5–L7 never reach for a --ca-* primitive. */
+  --edge-brand: var(--ca-grad-brand);
+  /* Metallic display fill for major page titles. Model Center, the 404 and the
+     glossary already painted their h1 this way via .ca-page-title, while the
+     matchup routes rendered flat white - the site read as two products. This
+     is the role so L7 can use it without touching a TIER 1 primitive. */
+  --text-display-metal: var(--ca-grad-metal-silver);
+  --edge-glint: linear-gradient(90deg, var(--ca-violet-a-32), transparent 70%);
+
+  /* —— Status tints (chip grounds) —— */
+  --tint-positive: var(--ca-green-a-13);
+  --tint-caution: var(--ca-amber-a-13);
+  --tint-negative: var(--ca-red-a-13);
+
+  /* —— Mark (chrome) vs value (readable data) —— */
+  --mark-positive: var(--ca-green-500);
+  --mark-negative: var(--ca-red-500);
+  --mark-caution: var(--ca-amber-500);
+  --value-positive: var(--ca-green-400);
+  --value-negative: var(--ca-red-200);
+  --value-caution: var(--ca-amber-400);
+
+  /* —— Metric ramp (green = elite → red = poor) —— */
+  --metric-very-weak: var(--ca-red-500);
+  --metric-weak: var(--ca-red-400);
+  --metric-below: var(--ca-amber-500);
+  --metric-neutral: var(--ca-paper-neutral);
+  --metric-above: var(--ca-green-400);
+  --metric-strong: var(--ca-green-300);
+  --metric-elite: var(--ca-green-200);
+  --metric-good: var(--ca-green-400);
+  --metric-watch: var(--ca-amber-500);
+  /* The middle of the grade ramp.
+   *
+   * It used to be --metric-neutral, a grey, which broke the ramp in half: the
+   * two good steps were green, the two poor steps were orange and red, and
+   * average was the absence of colour. A reader scanning a column could not
+   * tell "average" from "not graded", and the five steps did not read as one
+   * scale. Amber closes it into a single green-to-red spectrum. It stays
+   * separate from --metric-neutral, which is still a genuine grey for the
+   * things that are not on a grade ramp at all - a bar with no club colour, an
+   * unranked track. */
+  --metric-mid: var(--ca-amber-300);
+  --metric-poor: var(--ca-red-500);
+
+  /* —— Status —— */
+  --status-ok: var(--ca-green-200);
+  --status-live: var(--ca-green-200);
+  --status-stale: var(--ca-amber-400);
+  --status-error: var(--ca-red-500);
+  --status-loading: var(--ca-violet-300);
+
+  /* —— Control —— */
+  --control-bg: var(--ca-ink-800);
+  --control-bg-hover: var(--ca-ink-750);
+  --control-bg-active: var(--ca-violet-a-16);
+  --control-border: var(--ca-line-600);
+  --control-text: var(--ca-paper-50);
+
+  /* —— Focus —— */
+  --focus-ring: var(--ca-violet-500);
+  --focus-ring-offset: var(--ca-ink-950);
+
+  /* —— Shadow / elevation raw values (roles) —— */
+  --shadow-board: var(--ca-black-a-50);
+  --shadow-inset: var(--ca-white-a-08);
+  --shadow-deep: var(--ca-black-a-60);
+
+  /* —— Font families —— */
+  --font-ui: var(--ca-font-ui);
+  --font-display: var(--ca-font-display);
+  --font-body: var(--ca-font-ui);
+
+  /* —— Type scale (px; floor is 12 — no user-facing text below) —— */
+  --type-12: 12px;
+  --type-13: 13px;
+  --type-14: 14px;
+  --type-15: 15px;
+  --type-16: 16px;
+  --type-18: 18px;
+  --type-20: 20px;
+  --type-24: 24px;
+  --type-28: 28px;
+  --type-32: 32px;
+  --type-40: 40px;
+  --type-48: 48px;
+  --type-64: 64px;
+  /* —— Reading roles ——
+     Measured 2026-09-15 across the public pages: 4,458 of 6,466 rendered text
+     nodes (69%) sat at exactly 12px, because every secondary line reached for
+     --type-12 by name. The scale above says which sizes exist; a role says
+     what a piece of text is for, and carries the size that job needs to be
+     read on a dark desk. Rules consume a role, never a bare scale step. */
+  --type-floor: var(--type-12);  /* the absolute minimum; badges and counters only */
+  --type-meta: var(--type-13);   /* the line under a primary one: records, cities, dates */
+  --type-caps: var(--type-13);   /* uppercase labels, eyebrows, column heads */
+  --type-data: var(--type-14);   /* numbers in tables, ranks, graded values */
+  --type-note: var(--type-15);   /* explanatory paragraphs */
+  --type-ui: var(--type-14);
+  --type-body: var(--type-14);
+  --type-h3: var(--type-18);
+  --type-h2: var(--type-24);
+  /* Display sizes scale with the viewport. The flat 28/32px h1 made the 1440px
+     layout render at mobile type size — see audit D3. */
+  --type-h1: clamp(28px, 1.4rem + 1.5vw, 44px);
+  --type-display: clamp(32px, 1.5rem + 2.4vw, 56px);
+  --type-score: clamp(32px, 1.6rem + 2.2vw, 52px);
+  --type-section: clamp(20px, 1rem + 0.7vw, 26px);
+  --leading-tight: 1.15;
+  --leading-body: 1.45;
+  --leading-note: 1.6;
+  /* A paragraph on this desk ran the full panel width - about 200 characters a
+     line at 1440 - so the eye lost its place on every return sweep. */
+  --measure-note: 72ch;
+  /* 0.08em was drawn for 11px capitals. At 13px it spreads a label wider than
+     the column it heads; 0.06em keeps the letters apart without that. */
+  --tracking-caps: 0.06em;
+
+  /* —— Spacing: 4px scale only —— */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+
+  /* —— Radius —— */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* —— Elevation —— */
+  /* Depth on a matte desk comes from the border and the fill step, not from
+     shadow. The glow ramp is retained for surfaces that genuinely lift (menus,
+     dialogs) but no longer paints the resting slate. */
+  --elevation-0: none;
+  --elevation-1: none;
+  --elevation-2: none;
+  --elevation-3: 0 16px 48px var(--shadow-deep);
+  --elevation-glow: var(--ca-glow-violet);
+  --elevation-glow-strong: var(--ca-glow-violet-strong);
+
+  /* —— Motion —— */
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+  --motion-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* —— Shell / layout (architecture v2 §5–§6) —— */
+  /* 1360px left 280px of dead gutter each side at 1920 and 600px at 2560 -
+     53% of a wide screen unused. The desk is a dense board; it should fill the
+     display it is given, and the column contract below adds tracks instead of
+     stretching cards. */
+  --shell-max: 2100px;
+  --shell-gutter: 28px;
+  --shell-gutter-md: 20px;
+  --shell-gutter-sm: 16px;
+  --shell-header-h: 64px;
+  --shell-header-h-phone: 56px;
+  --shell-context-h: 36px;
+  --shell-context-h-phone: 40px;
+  --touch-min: 44px;
+  --z-header: 1000;
+  --z-overlay: 1100;
+  --z-dialog: 1200;
+}

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Booth mic</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0b0b0e;
+        --card: #16161c;
+        --text: #f4f4f5;
+        --muted: #a1a1aa;
+        --accent: #f5b942;
+        --go: #22c55e;
+        --bad: #f2545b;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, sans-serif; }
+      main { max-width: 420px; margin: 0 auto; padding: 48px 24px 80px; }
+      .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+      h1 { font-size: 34px; line-height: 1.05; margin: 8px 0 12px; }
+      p { color: var(--muted); line-height: 1.45; }
+      button {
+        width: 100%;
+        margin-top: 24px;
+        border: 0;
+        border-radius: 999px;
+        padding: 18px 20px;
+        font-size: 18px;
+        font-weight: 800;
+        background: var(--go);
+        color: #052e16;
+      }
+      button.off { background: var(--card); color: var(--text); }
+      .meter { height: 10px; background: #27272a; border-radius: 999px; overflow: hidden; margin-top: 28px; }
+      .meter > div { height: 100%; width: 0; background: var(--go); }
+      .status { margin-top: 18px; font-weight: 700; }
+      .status.wait { color: var(--accent); }
+      .status.live { color: var(--go); }
+      .status.err { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Recording booth</div>
+      <h1>This phone is the microphone.</h1>
+      <p>The desktop camera stays on the computer. Keep this page open and this phone a foot from your mouth while you record.</p>
+      <button id="go" type="button">Use this phone as the mic</button>
+      <div class="meter"><div id="bar"></div></div>
+      <div class="status wait" id="st">Waiting — tap the button, then Allow microphone.</div>
+    </main>
+    <script type="module">
+      const st = document.getElementById("st");
+      const bar = document.getElementById("bar");
+      const go = document.getElementById("go");
+      const say = (t, k) => { st.textContent = t; st.className = "status " + (k || "wait"); };
+
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      let pc, stream, ws, raf;
+
+      const level = (s) => {
+        const ctx = new AudioContext();
+        const src = ctx.createMediaStreamSource(s);
+        const an = ctx.createAnalyser();
+        an.fftSize = 1024;
+        src.connect(an);
+        const buf = new Float32Array(an.fftSize);
+        const tick = () => {
+          an.getFloatTimeDomainData(buf);
+          let sum = 0;
+          for (const v of buf) sum += v * v;
+          const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
+          bar.style.width = Math.max(0, Math.min(1, (db + 60) / 60)) * 100 + "%";
+          raf = requestAnimationFrame(tick);
+        };
+        tick();
+      };
+
+      const start = async () => {
+        go.disabled = true;
+        say("Asking for the microphone…");
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+            video: false,
+          });
+        } catch (e) {
+          go.disabled = false;
+          say("Microphone blocked: " + e.message + " If Safari warned about the certificate, tap Show Details and visit the site, then try again.", "err");
+          return;
+        }
+        level(stream);
+        ws = new WebSocket(proto + "//" + location.host + "/ws");
+        pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+        stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+        pc.onicecandidate = (e) => {
+          if (e.candidate) ws.send(JSON.stringify({ type: "ice", candidate: e.candidate }));
+        };
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ role: "phone" }));
+        };
+        const sendOffer = async () => {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          ws.send(JSON.stringify({ type: "offer", sdp: pc.localDescription }));
+          say("Connecting to the desktop…");
+        };
+        ws.onmessage = async (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "booth-ready") {
+            await sendOffer();
+          } else if (msg.type === "answer" && msg.sdp) {
+            await pc.setRemoteDescription(msg.sdp);
+            say("Live — leave this page open. Desktop camera is unchanged.", "live");
+            go.textContent = "Mic is live";
+            go.classList.add("off");
+          } else if (msg.type === "ice" && msg.candidate) {
+            try { await pc.addIceCandidate(msg.candidate); } catch {}
+          } else if (msg.type === "need-booth") {
+            say("On the computer: Setup → Microphone → Phone (desktop camera stays here).", "wait");
+          }
+        };
+        ws.onclose = () => say("Disconnected. Tap to reconnect.", "err");
+        ws.onerror = () => say("Could not reach the computer. Same Wi‑Fi, and allow the booth through Windows Firewall.", "err");
+      };
+      go.onclick = start;
+    </script>
+  </body>
+</html>

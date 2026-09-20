@@ -10,6 +10,7 @@ from chase_content.migrate import migrate
 from chase_content.render import render_reports
 from chase_content.util import read_json, write_json
 from chase_content.validate import validate_bundle
+from outputs.content_engine import run_booth
 
 REPORTS = ("all", "morning-slate", "offensive-report", "public-vs-sharp")
 
@@ -94,10 +95,15 @@ def _daily(args: argparse.Namespace) -> int:
     return 0
 
 
+def _booth(args: argparse.Namespace) -> int:
+    run_booth(args)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="chase-content",
-        description="Migrate verified Chase Analytics data and render social graphics.",
+        description="Chase Analytics content: daily reports and the recording booth.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -128,6 +134,25 @@ def build_parser() -> argparse.ArgumentParser:
     daily.add_argument("--opinions")
     daily.add_argument("--out", required=True)
     daily.set_defaults(handler=_daily)
+
+    booth = sub.add_parser(
+        "booth",
+        help="Recording booth: live graphics + camera, one take",
+    )
+    booth.add_argument("--games", help="AWAY@HOME from the live slate")
+    booth.add_argument("--sport", choices=["mlb", "nfl"], default="nfl")
+    booth.add_argument("--date")
+    booth.add_argument("--pack", help="existing pack, e.g. props/pack/2026-09-20-IND-KC")
+    booth.add_argument("--show", help="show / slot name, e.g. Sunday Night Football")
+    booth.add_argument("--tag", help="short badge, e.g. SNF")
+    booth.add_argument("--no-open", action="store_true", dest="no_open")
+    booth.add_argument(
+        "--video-platform",
+        default="reels",
+        dest="video_platform",
+        choices=["reels", "reels-ads", "tiktok", "shorts", "youtube"],
+    )
+    booth.set_defaults(handler=_booth)
 
     return parser
 

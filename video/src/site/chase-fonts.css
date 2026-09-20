@@ -1,0 +1,67 @@
+/*
+ * Self-hosted brand faces.
+ *
+ * Archivo (Omnibus-Type, SIL Open Font License 1.1 - see ARCHIVO-OFL.txt), one
+ * variable file per subset carrying both the weight (100-900) and width
+ * (62-125%) axes. The one file serves two families:
+ *
+ *   'Chase Sans'    UI, body, controls and numbers, at normal width.
+ *   'Chase Display' titles, scores and section heads: the same file pinned to
+ *                   72% width. A face whose font-stretch descriptor is a single
+ *                   value clamps the width axis to it, so every rule that names
+ *                   the display family gets the condensed cut without having to
+ *                   set font-stretch itself.
+ *
+ * Replaced DM Sans + Roboto Condensed on 2026-09-15 (owner direction: a more
+ * mature, original desk). Tokens name the brand families, never the vendor, so
+ * a future change of face is this file alone.
+ *
+ * Worth remembering: the previous faces were declared here, but the sport
+ * routes never linked this file. /mlb/, /nfl/ and every matchup page loaded
+ * zero faces (document.fonts.size === 0 on production) and rendered in the
+ * system fallback, while the home page and glossary rendered the brand. The
+ * route templates in scripts/build_sport_routes.py now link it.
+ *
+ * Latin and latin-ext only. font-display: swap keeps text visible while the
+ * faces arrive.
+ */
+
+@font-face {
+  font-family: 'Chase Sans';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(./archivo-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Chase Sans';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url(./archivo-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Chase Display';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 72%;
+  font-display: swap;
+  src: url(./archivo-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: 'Chase Display';
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 72%;
+  font-display: swap;
+  src: url(./archivo-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

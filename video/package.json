@@ -1,0 +1,45 @@
+{
+  "name": "video",
+  "version": "1.0.0",
+  "description": "Chase Analytics video graphics package (Remotion) - styled by the live site",
+  "repository": {},
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@remotion/cli": "4.0.520",
+    "@remotion/google-fonts": "^4.0.520",
+    "@remotion/tailwind-v4": "4.0.520",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.520",
+    "tailwindcss": "4.0.0"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.520",
+    "@remotion/captions": "4.0.520",
+    "@remotion/eslint-config-flat": "4.0.520",
+    "@remotion/install-whisper-cpp": "4.0.520",
+    "@remotion/player": "4.0.520",
+    "@remotion/renderer": "4.0.520",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@types/web": "0.0.166",
+    "esbuild": "0.28.1",
+    "eslint": "9.19.0",
+    "prettier": "3.8.1",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion bundle",
+    "upgrade": "remotion upgrade",
+    "lint": "eslint src && tsc",
+    "sync-style": "cd .. && python -m outputs.content_engine sync-style",
+    "predev": "npm run sync-style",
+    "snap": "node scripts/snap.mjs",
+    "snap:all": "node scripts/snap.mjs --all"
+  },
+  "sideEffects": [
+    "*.css"
+  ]
+}

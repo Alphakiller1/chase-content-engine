@@ -16,7 +16,7 @@ dev = ["pytest>=8", "ruff>=0.6"]
 chase-content = "chase_content.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["chase_content*"]
+include = ["chase_content*", "outputs*"]
 
 [tool.setuptools.package-data]
 chase_content = ["fonts/*.ttf"]

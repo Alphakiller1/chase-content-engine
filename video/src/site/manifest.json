@@ -1,0 +1,22 @@
+{
+  "stamp": "20260916a",
+  "route": "/nfl/",
+  "sheets": [
+    "/dashboard/assets/fonts/chase-fonts.css",
+    "/design/chase-tokens-v1.css",
+    "/dashboard/styles/chase-semantic.css",
+    "/dashboard/styles/chase-primitives.css",
+    "/dashboard/styles/chase-components.css",
+    "/dashboard/styles/chase-patterns.css",
+    "/dashboard/styles/chase-shell.css",
+    "/dashboard/chase_nav.css",
+    "/dashboard/styles/chase-public.css"
+  ],
+  "icon": "/dashboard/assets/chase-icon-filled.png",
+  "synced_at": "2026-09-17T12:49:34",
+  "video_sheets": [
+    "chase-fonts.css",
+    "chase-tokens-v1.css",
+    "chase-semantic.css"
+  ]
+}
