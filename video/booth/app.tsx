@@ -177,7 +177,6 @@ const App: React.FC = () => {
   const [camId, setCamId] = useState(() => readPref("booth.cam", ""));
   const [micId, setMicId] = useState(() => readPref("booth.mic", ""));
   const [mirror, setMirror] = useState(() => readPref("booth.mirror", "1") === "1");
-  const [level, setLevel] = useState(0);
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const [phoneTrack, setPhoneTrack] = useState<MediaStreamTrack | null>(null);
   const [phoneState, setPhoneState] = useState<"off" | "wait" | "live">("off");
@@ -210,6 +209,7 @@ const App: React.FC = () => {
   const [showZones, setShowZones] = useState(() => readPref("booth.zones", "1") === "1");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const playerRef = useRef<PlayerRef>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -515,7 +515,12 @@ const App: React.FC = () => {
       let sum = 0;
       for (const v of buf) sum += v * v;
       const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
-      setLevel(Math.max(0, Math.min(1, (db + 60) / 60)));
+      const level = Math.max(0, Math.min(1, (db + 60) / 60));
+      if (meterRef.current) {
+        meterRef.current.style.transform = `scaleX(${level})`;
+        meterRef.current.style.background =
+          level > 0.9 ? "var(--mark-negative)" : level > 0.45 ? "var(--mark-positive)" : "var(--text-muted)";
+      }
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -1002,6 +1007,7 @@ const App: React.FC = () => {
                 opacity: G.cam.w > 0 ? 1 : 0,
               }}
             >
+              {/* eslint-disable-next-line @remotion/warn-native-media-tag -- this is a live MediaStream preview, not timeline media. */}
               <video
                 ref={videoRef}
                 autoPlay
@@ -1093,6 +1099,8 @@ const App: React.FC = () => {
             <select
               className="pack-pick"
               value={cat.pack}
+              disabled={recording}
+              aria-label="Select game pack"
               onChange={async (e) => {
                 const id = e.target.value;
                 await fetch("/api/pack", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
@@ -1458,12 +1466,7 @@ const App: React.FC = () => {
           </label>
         </details>
         <div className="meter" title="Talk normally: the bar should reach the green zone">
-          <div
-            style={{
-              width: `${level * 100}%`,
-              background: level > 0.9 ? "var(--mark-negative)" : level > 0.45 ? "var(--mark-positive)" : "var(--text-muted)",
-            }}
-          />
+          <div ref={meterRef} />
         </div>
         {camError ? <div className="error">{camError}</div> : null}
         {capsNote ? <div className="hint">{capsNote}</div> : null}

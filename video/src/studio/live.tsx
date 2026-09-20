@@ -110,11 +110,22 @@ export const Fit: React.FC<{ children: React.ReactNode; innerStyle?: React.CSSPr
     const o = outer.current;
     const i = inner.current;
     if (!o || !i) return;
-    const kh = o.clientHeight / Math.max(1, i.scrollHeight);
-    const kw = o.clientWidth / Math.max(1, i.scrollWidth);
-    const next = Math.max(min, Math.min(1, kh, kw));
-    if (Math.abs(next - k) > 0.004) setK(next);
-  });
+    const measure = () => {
+      const kh = o.clientHeight / Math.max(1, i.scrollHeight);
+      const kw = o.clientWidth / Math.max(1, i.scrollWidth);
+      const next = Math.max(min, Math.min(1, kh, kw));
+      setK((current) => (Math.abs(next - current) > 0.004 ? next : current));
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(o);
+    observer?.observe(i);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [min]);
   return (
     <div
       ref={outer}

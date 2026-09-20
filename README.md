@@ -100,6 +100,8 @@ See [docs/MIGRATION.md](docs/MIGRATION.md) for the upstream contract and cutover
 
 ## Recording booth
 
+The studio and Remotion graphics follow the shared [Broadcast Design System](docs/BROADCAST_DESIGN_SYSTEM.md).
+
 Permanent video path for this repo. After `npm install` in `video/`:
 
 ```powershell

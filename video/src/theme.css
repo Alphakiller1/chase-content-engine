@@ -53,6 +53,13 @@ body {
   --vid-take: 48px;
   --vid-caps-track: 0.04em;
 
+  /* Broadcast system: one depth scale and one geometry language across boards. */
+  --vid-radius-panel: 18px;
+  --vid-radius-data: 10px;
+  --vid-shadow-panel: 0 22px 54px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  --vid-rule-strong: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  --vid-track: color-mix(in srgb, var(--text-primary) 7%, transparent);
+
   /* The site's own surface for a video card: the card ink at a small transparency
      so it still sits over footage. Derived from tokens, not a new colour. */
   --vid-glass: color-mix(in srgb, var(--surface-card) 96%, transparent);

@@ -1,11 +1,12 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, TeamLogo, Title } from "../ds/kit";
+import { Caps, TeamLogo } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League, teamAccent } from "../teams";
 import { Count, Fit } from "./live";
 import { toneFromRank } from "./statColor";
+import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
 export type PersonnelShare = { code: string; label: string; rate: number };
@@ -218,24 +219,28 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
         opacity: exit,
       }}
     >
-      <Fit min={1}>
-        <div style={{ textAlign: "center" }}>
-          <div style={rise(frame, fps, 0)}>
-            <Eyebrow size={wide ? 24 : 26}>{eyebrow}</Eyebrow>
-          </div>
-          <div style={{ marginTop: 6, ...rise(frame, fps, 0.06) }}>
-            <Title size={wide ? 64 : 70}>{title}</Title>
-          </div>
+      <BroadcastBackdrop league={league} away={awayLook.team} home={homeLook.team} />
+      <Fit min={0.88}>
+        <div style={rise(frame, fps, 0)}>
+          <BroadcastHeader
+            league={league}
+            away={awayLook.team}
+            home={homeLook.team}
+            awayName={awayLook.teamName}
+            homeName={homeLook.teamName}
+            eyebrow={eyebrow}
+            title={title}
+            meta={`${view === "coverage" ? "Coverage structure" : "Personnel usage"} · illustrative alignment`}
+            wide={wide}
+          />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: wide ? "1fr 1fr" : "1fr", gap: wide ? 36 : 28, marginTop: 22, alignItems: "stretch" }}>
           {field(awayLook, 0.12)}
           {field(homeLook, 0.2)}
         </div>
         {note ? (
-          <div style={{ marginTop: 16, textAlign: "center", opacity: progress(frame, fps, 1.1, 0.4) }}>
-            <Deck size={wide ? 22 : 26} style={{ color: "var(--text-primary)", opacity: 0.82, lineHeight: 1.35 }}>
-              {note}
-            </Deck>
+          <div style={{ marginTop: 16, opacity: progress(frame, fps, 1.1, 0.4) }}>
+            <InsightFooter wide={wide} label="Illustration">{note}</InsightFooter>
           </div>
         ) : null}
       </Fit>

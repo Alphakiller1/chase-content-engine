@@ -580,7 +580,7 @@ export const Episode: React.FC<EpisodeProps> = (p) => {
           <FullFrame b={p.outro} />
         </Sequence>
       ) : null}
-      {p.music ? <Audio src={staticFile(p.music.src)} volume={p.music.volume} loop /> : null}
+      {p.music ? <Audio src={staticFile(p.music.src)} volume={() => p.music?.volume ?? 1} loop /> : null}
     </AbsoluteFill>
   );
 };
