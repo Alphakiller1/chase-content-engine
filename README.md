@@ -100,6 +100,8 @@ See [docs/MIGRATION.md](docs/MIGRATION.md) for the upstream contract and cutover
 
 ## Recording booth
 
+The studio and Remotion graphics follow the shared [Broadcast Design System](docs/BROADCAST_DESIGN_SYSTEM.md).
+
 Permanent video path for this repo. After `npm install` in `video/`:
 
 ```powershell
@@ -107,6 +109,14 @@ chase-content booth --sport nfl --games IND@KC --show "Week 3 Sunday Night Footb
 .\content.bat booth --sport nfl --games IND@KC
 .\booth.bat
 ```
+
+From an existing Windows checkout, update and launch the current booth in one step:
+
+```powershell
+.\update-booth.bat
+```
+
+`booth.bat` now installs the video dependencies automatically on its first launch.
 
 Graphics come from the live chase-analytics.com slate plus the hosted nfl-model board
 (research only: a gap is a disagreement, not an edge). Takes land in `video/footage/`.

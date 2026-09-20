@@ -1,11 +1,12 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, TeamLogo, Title } from "../ds/kit";
+import { Caps } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League } from "../teams";
 import { Fit, Count } from "./live";
 import { ordinal, toneFromMix, toneFromRank, type StatCat } from "./statColor";
+import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
 type Side = { value: number; display: string; rank: number | null; of: number };
@@ -66,10 +67,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
   const valueSize = Math.min(wide ? 50 : 56, rowH * 0.52);
   const rankH = wide ? 26 : 28;
 
-  const pctLen = (s: Side) => {
-    if (!s.rank || !s.of) return 0.42;
-    return Math.max(0.1, (s.of - s.rank + 1) / s.of);
-  };
+  const pctLen = (s: Side) => (s.rank && s.of ? Math.max(0.1, (s.of - s.rank + 1) / s.of) : 0);
 
   const valueBlock = (s: Side, align: "left" | "right", at: number, cat: StatCat, invert: boolean) => {
     const tone = toneFromRank(s.rank, s.of, cat, invert);
@@ -107,66 +105,20 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
         opacity: exit,
       }}
     >
+      <BroadcastBackdrop league={league} away={away} home={home} />
       <Fit>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0,1fr) auto minmax(0,1fr)",
-            alignItems: "center",
-            columnGap: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, ...rise(frame, fps, 0) }}>
-            <TeamLogo team={away} league={league} size={wide ? 52 : 58} />
-            <div style={{ minWidth: 0 }}>
-              <Caps size={wide ? 20 : 22}>{away}</Caps>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 800,
-                  fontSize: wide ? 36 : 38,
-                  color: "var(--text-primary)",
-                  lineHeight: 1.05,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {awayName}
-              </div>
-            </div>
-          </div>
-          <div style={{ textAlign: "center", padding: "0 12px" }}>
-            <div style={rise(frame, fps, 0)}>
-              <Eyebrow size={wide ? 22 : 24}>{eyebrow}</Eyebrow>
-            </div>
-            <div style={{ marginTop: 4, ...rise(frame, fps, 0.06) }}>
-              <Title size={wide ? 54 : 58}>{title}</Title>
-            </div>
-            <Caps size={wide ? 16 : 18} color="var(--text-primary)" style={{ marginTop: 8, letterSpacing: "0.08em" }}>
-              {poolLabel}
-            </Caps>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexDirection: "row-reverse", minWidth: 0, ...rise(frame, fps, 0) }}>
-            <TeamLogo team={home} league={league} size={wide ? 52 : 58} />
-            <div style={{ minWidth: 0, textAlign: "right" }}>
-              <Caps size={wide ? 20 : 22}>{home}</Caps>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 800,
-                  fontSize: wide ? 36 : 38,
-                  color: "var(--text-primary)",
-                  lineHeight: 1.05,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {homeName}
-              </div>
-            </div>
-          </div>
+        <div style={rise(frame, fps, 0)}>
+          <BroadcastHeader
+            league={league}
+            away={away}
+            home={home}
+            awayName={awayName}
+            homeName={homeName}
+            eyebrow={eyebrow}
+            title={title}
+            meta={poolLabel}
+            wide={wide}
+          />
         </div>
 
         <div style={{ marginTop: wide ? 16 : 20 }}>
@@ -177,6 +129,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
             const invert = r.better === "low";
             const bar = (s: Side, left: boolean) => {
               const tone = toneFromRank(s.rank, s.of, cat === "identity" ? "quality" : cat, invert);
+              const known = Boolean(s.rank && s.of);
               return (
                 <div style={{ display: "flex", justifyContent: left ? "flex-end" : "flex-start", alignItems: "center", minWidth: 0 }}>
                   <div
@@ -184,7 +137,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
                       width: `${pctLen(s) * 100 * grow}%`,
                       height: Math.max(10, rowH * 0.24),
                       borderRadius: 2,
-                      background: tone,
+                      background: known ? tone : "var(--vid-track)",
                     }}
                   />
                 </div>
@@ -259,7 +212,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
 
         {note ? (
           <div style={{ marginTop: wide ? 14 : 18, opacity: progress(frame, fps, 1.1, 0.4) }}>
-            <Deck size={wide ? 20 : 24} style={{ color: "var(--text-primary)", opacity: 0.8 }}>{note}</Deck>
+            <InsightFooter wide={wide}>{note}</InsightFooter>
           </div>
         ) : null}
       </Fit>

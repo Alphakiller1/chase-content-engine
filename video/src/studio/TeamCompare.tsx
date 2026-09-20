@@ -1,11 +1,12 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, TeamLogo, Title } from "../ds/kit";
+import { Caps, TeamLogo } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League, teamAccent } from "../teams";
 import { Count, Fit, Sheen } from "./live";
 import { parseStat, toneFromPair, toneFromRank } from "./statColor";
+import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
 export type TeamSide = {
@@ -201,17 +202,20 @@ export const TeamCompare: React.FC<TeamCompareProps> = ({
         opacity: exit,
       }}
     >
+      <BroadcastBackdrop league={league} away={awaySide.abbr} home={homeSide.abbr} />
       <Fit>
-        <div style={{ textAlign: "center" }}>
-          <div style={rise(frame, fps, 0)}>
-            <Eyebrow size={wide ? 24 : 26}>{eyebrow}</Eyebrow>
-          </div>
-          <div style={{ marginTop: 6, ...rise(frame, fps, 0.06) }}>
-            <Title size={wide ? 68 : 72}>{title}</Title>
-          </div>
-          <Caps size={wide ? 20 : 22} style={{ marginTop: 10 }}>
-            {[kickoff, network].filter(Boolean).join(" · ")}
-          </Caps>
+        <div style={rise(frame, fps, 0)}>
+          <BroadcastHeader
+            league={league}
+            away={awaySide.abbr}
+            home={homeSide.abbr}
+            awayName={awaySide.name}
+            homeName={homeSide.name}
+            eyebrow={eyebrow}
+            title={title}
+            meta={[kickoff, network].filter(Boolean).join(" · ")}
+            wide={wide}
+          />
         </div>
         <div
           style={{
@@ -261,8 +265,8 @@ export const TeamCompare: React.FC<TeamCompareProps> = ({
             ))}
         </div>
         {note ? (
-          <div style={{ marginTop: 16, textAlign: "center", opacity: progress(frame, fps, 1.1, 0.4) }}>
-            <Deck size={wide ? 20 : 24}>{note}</Deck>
+          <div style={{ marginTop: 16, opacity: progress(frame, fps, 1.1, 0.4) }}>
+            <InsightFooter wide={wide}>{note}</InsightFooter>
           </div>
         ) : null}
       </Fit>

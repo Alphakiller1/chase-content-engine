@@ -100,6 +100,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const Annotate: React.FC<AnnotateProps> = ({ platform, capture, steps, eyebrow, title, ground = true }) => {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
+  const safe = useSafe(platform);
   if (!capture.src) {
     return (
       <AbsoluteFill style={{ background: "var(--surface-page)", justifyContent: "center", alignItems: "center", padding: 80 }}>
@@ -111,7 +112,6 @@ export const Annotate: React.FC<AnnotateProps> = ({ platform, capture, steps, ey
     );
   }
   const wide = width > height;
-  const safe = useSafe(platform);
   const pad = wide ? 64 : 24;
   const headH = (eyebrow ? (wide ? 40 : 48) : 0) + (title ? (wide ? 96 : 120) : 0) + (eyebrow || title ? 24 : 0);
   const stageTop = safe.top + (wide ? 48 : 60) + headH;

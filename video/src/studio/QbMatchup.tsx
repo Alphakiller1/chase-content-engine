@@ -1,11 +1,12 @@
 import React from "react";
 import { AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, StatusPill, TeamLogo, Title } from "../ds/kit";
+import { Caps, StatusPill, TeamLogo } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League, teamAccent, teamColors } from "../teams";
 import { Count, Fit, Sheen } from "./live";
 import { toneFromPair } from "./statColor";
+import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
 export type QbFace = {
@@ -178,14 +179,20 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
         opacity: exit,
       }}
     >
+      <BroadcastBackdrop league={league} away={awayQb.team} home={homeQb.team} />
       <Fit>
-        <div style={{ textAlign: "center" }}>
-          <div style={rise(frame, fps, 0)}>
-            <Eyebrow size={wide ? 24 : 26}>{eyebrow}</Eyebrow>
-          </div>
-          <div style={{ marginTop: 6, ...rise(frame, fps, 0.08) }}>
-            <Title size={wide ? 72 : 78}>{title}</Title>
-          </div>
+        <div style={rise(frame, fps, 0)}>
+          <BroadcastHeader
+            league={league}
+            away={awayQb.team}
+            home={homeQb.team}
+            awayName={awayQb.teamName}
+            homeName={homeQb.teamName}
+            eyebrow={eyebrow}
+            title={title}
+            meta={`${awayQb.position || "QB"} comparison · season and recent starts`}
+            wide={wide}
+          />
         </div>
         <div
           style={{
@@ -307,8 +314,8 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
             })}
         </div>
         {note ? (
-          <div style={{ marginTop: 18, textAlign: "center", opacity: progress(frame, fps, 1.15, 0.4) }}>
-            <Deck size={wide ? 20 : 24}>{note}</Deck>
+          <div style={{ marginTop: 18, opacity: progress(frame, fps, 1.15, 0.4) }}>
+            <InsightFooter wide={wide}>{note}</InsightFooter>
           </div>
         ) : null}
       </Fit>
