@@ -17,6 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
+import { paintBooth, playerCanvas, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -212,6 +213,9 @@ const App: React.FC = () => {
   const [showZones, setShowZones] = useState(() => readPref("booth.zones", "1") === "1");
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const phoneAudioRef = useRef<HTMLAudioElement>(null);
+  const playerBoxRef = useRef<HTMLDivElement>(null);
+  const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const playerRef = useRef<PlayerRef>(null);
@@ -415,18 +419,47 @@ const App: React.FC = () => {
   }, [camId, micId]);
 
   useEffect(() => {
+    if (!phoneTrack) return;
+    phoneTrack.enabled = true;
+    const ctx = new AudioContext();
+    void ctx.resume();
+    const src = ctx.createMediaStreamSource(new MediaStream([phoneTrack]));
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    const el = phoneAudioRef.current;
+    if (el) {
+      el.srcObject = new MediaStream([phoneTrack]);
+      el.muted = true;
+      void el.play();
+    }
+    return () => {
+      void ctx.close();
+      if (el) el.srcObject = null;
+    };
+  }, [phoneTrack]);
+
+  useEffect(() => {
     if (!camStream) {
       setStream(null);
       return;
     }
     const mixed = new MediaStream();
+    const extra: MediaStreamTrack[] = [];
     for (const t of camStream.getVideoTracks()) mixed.addTrack(t);
     if (micId === "phone") {
-      if (phoneTrack) mixed.addTrack(phoneTrack);
+      if (phoneTrack && phoneTrack.readyState === "live") {
+        const clone = phoneTrack.clone();
+        clone.enabled = true;
+        extra.push(clone);
+        mixed.addTrack(clone);
+      }
     } else {
       for (const t of camStream.getAudioTracks()) mixed.addTrack(t);
     }
     setStream(mixed);
+    return () => extra.forEach((t) => t.stop());
   }, [camStream, phoneTrack, micId]);
 
   useEffect(() => {
@@ -493,8 +526,10 @@ const App: React.FC = () => {
   /* mic level */
   useEffect(() => {
     if (!stream || !stream.getAudioTracks().length) return;
+    const clones = stream.getAudioTracks().map((t) => t.clone());
     const ctx = new AudioContext();
-    const src = ctx.createMediaStreamSource(stream);
+    void ctx.resume();
+    const src = ctx.createMediaStreamSource(new MediaStream(clones));
     const an = ctx.createAnalyser();
     an.fftSize = 1024;
     src.connect(an);
@@ -516,6 +551,7 @@ const App: React.FC = () => {
     tick();
     return () => {
       cancelAnimationFrame(raf);
+      clones.forEach((t) => t.stop());
       ctx.close();
     };
   }, [stream]);
@@ -692,9 +728,32 @@ const App: React.FC = () => {
   /* recording */
   const beginRecording = useCallback(() => {
     if (!stream) return;
+    const recW = format === "wide" ? 1920 : 1080;
+    const recH = format === "wide" ? 1080 : 1920;
+    const geom = frameGeom(format, platform, mode, CAM[format], size);
     const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-    const rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5_000_000, audioBitsPerSecond: 192_000 });
+    const canvas = document.createElement("canvas");
+    canvas.width = recW;
+    canvas.height = recH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    let raf = 0;
+    const paint = () => {
+      paintBooth(ctx, {
+        w: recW,
+        h: recH,
+        geom,
+        video: videoRef.current,
+        graphic: playerCanvas(playerBoxRef.current),
+        mirror,
+      });
+      raf = requestAnimationFrame(paint);
+    };
+    paint();
+    const picture = STATIC ? canvas.captureStream(30) : new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
+    const recStream = withAudio(picture, stream);
+    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 192_000 });
     chunks.current = [];
     strokeStore.current = [];
     nextStrokeId.current = 1;
@@ -714,16 +773,18 @@ const App: React.FC = () => {
       setNonce((n) => n + 1);
     };
     rec.onstop = async () => {
+      cancelAnimationFrame(raf);
+      recStream.getTracks().forEach((t) => t.stop());
       setPhase("saving");
       const name = stamp();
       try {
-        const blob = new Blob(chunks.current, { type: "video/webm" });
+        const blob = new Blob(chunks.current, { type: mimeType || "video/webm" });
+        lastTake.current = blob;
         if (STATIC) {
-          downloadBlob(`${name}.webm`, blob, "video/webm");
-          downloadBlob(`${name}.cues.json`, JSON.stringify({ cues: cuesRef.current, strokes: strokeStore.current }, null, 2), "application/json");
+          downloadBlob(`${name}-broadcast.webm`, blob, blob.type);
           setSaved(name);
           setPhase("saved");
-          setMessage("Take downloaded on this computer. Auto-edit still runs from a local booth checkout.");
+          setMessage("Broadcast take downloaded — graphics, camera, and mic together.");
           return;
         }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
@@ -743,7 +804,7 @@ const App: React.FC = () => {
     };
     recRef.current = rec;
     rec.start(1000);
-  }, [currentKey, mode, overlaysOn, size, stream]);
+  }, [STATIC, currentKey, format, mirror, mode, overlaysOn, platform, size, stream]);
 
   const toggleRecord = useCallback(() => {
     if (phase === "recording") {
@@ -756,7 +817,9 @@ const App: React.FC = () => {
       return;
     }
     if (phase === "saving" || !stream) return;
-    if (micId === "phone" && !phoneTrack) return say("Phone mic is not connected yet");
+    if (micId === "phone" && (!phoneTrack || !stream.getAudioTracks().length)) {
+      return say("Phone mic is not in the recorder yet — wait until it says Phone mic live");
+    }
     setCount(3);
     setPhase("countdown");
   }, [micId, phase, phoneTrack, say, stream]);
@@ -1013,7 +1076,10 @@ const App: React.FC = () => {
                 playsInline
                 style={{ borderRadius: Math.max(0, G.cam.r - ringPad), transform: mirror ? "scaleX(-1)" : undefined }}
               />
+              {/* Keep WebRTC phone audio actually playing so MediaRecorder gets samples. */}
+              <audio ref={phoneAudioRef} autoPlay playsInline style={{ display: "none" }} />
             </div>
+            <div ref={playerBoxRef} style={{ position: "absolute", inset: 0, width: W, height: H }}>
             <Player
               key={format}
               ref={playerRef}
@@ -1029,6 +1095,7 @@ const App: React.FC = () => {
               initialFrame={startFrame}
               acknowledgeRemotionLicense
             />
+            </div>
             <svg
               ref={svgRef}
               width={W}
@@ -1178,12 +1245,25 @@ const App: React.FC = () => {
           {phase === "saved" ? (
             <div className="saved">
               <div>
-                {STATIC ? <>Downloaded <b>{saved}.webm</b> to this computer</> : <>Saved <b>{saved}</b> in video\footage</>}
+                {STATIC ? (
+                  <>Downloaded <b>{saved}-broadcast.webm</b> — graphics, camera, and mic</>
+                ) : (
+                  <>Saved <b>{saved}</b> in video\footage</>
+                )}
               </div>
-              {STATIC ? null : (
-              <button className="big go" onClick={makeVideo}>
-                Make my video
-              </button>
+              {STATIC ? (
+                <button
+                  className="big go"
+                  onClick={() => {
+                    if (lastTake.current) downloadBlob(`${saved}-broadcast.webm`, lastTake.current, lastTake.current.type);
+                  }}
+                >
+                  Download broadcast take
+                </button>
+              ) : (
+                <button className="big go" onClick={makeVideo}>
+                  Make my video
+                </button>
               )}
             </div>
           ) : null}
