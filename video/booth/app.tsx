@@ -17,7 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { paintBooth, playerCanvas, withAudio } from "./composite";
+import { paintBooth, rasterizeGraphic, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -743,7 +743,6 @@ const App: React.FC = () => {
     if (!stream) return;
     const recW = format === "wide" ? 1920 : 1080;
     const recH = format === "wide" ? 1080 : 1920;
-    const geom = frameGeom(format, platform, mode, CAM[format], size);
     const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
     const canvas = document.createElement("canvas");
@@ -752,13 +751,30 @@ const App: React.FC = () => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     let raf = 0;
+    let snapBusy = false;
+    let graphicSnap: HTMLCanvasElement | null = null;
     const paint = () => {
+      const graphicRoot = playerBoxRef.current;
+      if (STATIC && graphicRoot && !snapBusy) {
+        snapBusy = true;
+        rasterizeGraphic(graphicRoot, recW, recH)
+          .then((shot) => {
+            graphicSnap = shot;
+          })
+          .catch(() => {
+            graphicSnap = null;
+          })
+          .finally(() => {
+            snapBusy = false;
+          });
+      }
       paintBooth(ctx, {
         w: recW,
         h: recH,
-        geom,
+        geom: frameGeom(format, platform, mode, CAM[format], size),
         video: videoRef.current,
-        graphic: playerCanvas(playerRef.current?.getContainerNode?.() ?? playerBoxRef.current, recW, recH),
+        graphicRoot,
+        graphicSnap,
         mirror,
       });
       raf = requestAnimationFrame(paint);

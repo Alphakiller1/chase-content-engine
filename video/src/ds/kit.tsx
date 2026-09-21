@@ -8,7 +8,7 @@
  * looks like what they just watched.
  */
 import React from "react";
-import { CanvasImage, Img, staticFile } from "remotion";
+import { Img, staticFile } from "remotion";
 import { League, teamAccent, teamLogoPath } from "../teams";
 
 /* ── brand ────────────────────────────────────────────────────────────────── */
@@ -290,10 +290,7 @@ export const TeamLogo: React.FC<{ team: string; league: League; size: number }> 
   league,
   size,
 }) => (
-  <CanvasImage
-    src={staticFile(teamLogoPath(team, league))}
-    style={{ width: size, height: size }}
-  />
+  <Img src={staticFile(teamLogoPath(team, league))} style={{ width: size, height: size, objectFit: "contain" }} />
 );
 
 /** Logo + abbreviation in the club's legible accent. */

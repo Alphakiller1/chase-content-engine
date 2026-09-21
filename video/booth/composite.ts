@@ -1,3 +1,4 @@
+import { toCanvas } from "html-to-image";
 import type { FrameGeom } from "../src/edit/frames";
 
 const pageFill = () => {
@@ -44,30 +45,63 @@ const drawCover = (
   ctx.restore();
 };
 
-/** The Remotion program canvas, never a nested team-logo CanvasImage. */
-export const playerCanvas = (
-  root: HTMLElement | null | undefined,
-  w?: number,
-  h?: number,
-): HTMLCanvasElement | null => {
-  if (!root) return null;
-  const canvases = [...root.querySelectorAll("canvas")];
-  if (!canvases.length) return null;
-  const depth = (el: HTMLElement) => {
-    let d = 0;
-    for (let n = el.parentElement; n && n !== root; n = n.parentElement) d += 1;
-    return d;
+const mapRect = (el: Element, origin: DOMRect, frameW: number, frameH: number) => {
+  const r = el.getBoundingClientRect();
+  if (r.width < 2 || r.height < 2 || !origin.width || !origin.height) return null;
+  const style = getComputedStyle(el);
+  if (style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) return null;
+  return {
+    x: ((r.left - origin.left) / origin.width) * frameW,
+    y: ((r.top - origin.top) / origin.height) * frameH,
+    w: (r.width / origin.width) * frameW,
+    h: (r.height / origin.height) * frameH,
   };
-  const score = (c: HTMLCanvasElement) => {
-    const exact = w && h && c.width === w && c.height === h ? 0 : 1;
-    const aspect =
-      w && h && c.height
-        ? Math.abs(c.width / c.height - w / h)
-        : 99;
-    return exact * 1_000_000 + aspect * 10_000 + depth(c) * 100 - Math.min(c.width * c.height, 9_000_000) / 1_000_000;
-  };
-  return [...canvases].sort((a, b) => score(a) - score(b))[0] ?? null;
 };
+
+/** Draw every nested canvas/image at its on-screen box. Never stretch one logo over the frame. */
+export const drawGraphicLayers = (
+  ctx: CanvasRenderingContext2D,
+  root: HTMLElement,
+  frameW: number,
+  frameH: number,
+) => {
+  const origin = root.getBoundingClientRect();
+  const anyCtx = ctx as CanvasRenderingContext2D & {
+    drawElementImage?: (el: Element, dx: number, dy: number, dw: number, dh: number) => void;
+  };
+  if (typeof anyCtx.drawElementImage === "function") {
+    try {
+      anyCtx.drawElementImage(root, 0, 0, frameW, frameH);
+      return;
+    } catch {
+      /* fall through to mapped layers */
+    }
+  }
+  for (const el of root.querySelectorAll("canvas, img, svg")) {
+    const box = mapRect(el, origin, frameW, frameH);
+    if (!box) continue;
+    try {
+      ctx.drawImage(el as CanvasImageSource, box.x, box.y, box.w, box.h);
+    } catch {
+      /* tainted or zero-size source */
+    }
+  }
+};
+
+export const rasterizeGraphic = (el: HTMLElement, w: number, h: number): Promise<HTMLCanvasElement> =>
+  toCanvas(el, {
+    width: w,
+    height: h,
+    canvasWidth: w,
+    canvasHeight: h,
+    pixelRatio: 1,
+    cacheBust: false,
+    skipFonts: true,
+    filter: (node) => {
+      const tag = node.tagName;
+      return tag !== "VIDEO" && tag !== "AUDIO";
+    },
+  });
 
 /** Paint the booth picture (camera under graphics) onto a recording canvas. */
 export const paintBooth = (
@@ -77,11 +111,12 @@ export const paintBooth = (
     h: number;
     geom: FrameGeom;
     video: HTMLVideoElement | null;
-    graphic: HTMLCanvasElement | null;
+    graphicRoot: HTMLElement | null;
+    graphicSnap: HTMLCanvasElement | null;
     mirror: boolean;
   },
 ) => {
-  const { w, h, geom, video, graphic, mirror } = opts;
+  const { w, h, geom, video, graphicRoot, graphicSnap, mirror } = opts;
   ctx.fillStyle = pageFill();
   ctx.fillRect(0, 0, w, h);
   const cam = geom.cam;
@@ -91,7 +126,11 @@ export const paintBooth = (
     drawCover(ctx, video, cam.x, cam.y, cam.w, cam.h, mirror);
     ctx.restore();
   }
-  if (graphic && graphic.width) ctx.drawImage(graphic, 0, 0, w, h);
+  if (graphicSnap && graphicSnap.width) {
+    ctx.drawImage(graphicSnap, 0, 0, w, h);
+  } else if (graphicRoot) {
+    drawGraphicLayers(ctx, graphicRoot, w, h);
+  }
 };
 
 export const withAudio = (video: MediaStream, voice: MediaStream | null) => {
