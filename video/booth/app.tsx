@@ -1633,7 +1633,7 @@ const App: React.FC = () => {
                   ["Space / ↓", "Next group · Shift+Space / ↑ previous"],
                   ["/", "Search every graphic and player"],
                   ["A S D F", "Layout: bubble · split · graphic only · camera only"],
-                  ["Click a face", "Spotlight that player (formations) · Esc clears"],
+                  ["Esc", "Clear a player spotlight"],
                   ["Drag on the picture", "Draw · T colour · X arrow tip · C clear · P turns drawing on/off"],
                   ["B N K", "Small graphics over the top: matchup bug · name strap · line ticker"],
                   ["[ ]", "Graphic size: smaller · bigger"],

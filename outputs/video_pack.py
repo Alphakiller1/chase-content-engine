@@ -46,10 +46,10 @@ from outputs.content_engine import (
 )
 from outputs.last_game import last_game_items
 from outputs.live_lines import game_odds, player_props
+from outputs.week_form import overlay_week_form
 from outputs.video_studio import (
     clash_items,
     cover_heat_items,
-    formation_items,
     line_move_item,
     metric_items,
     player_items,
@@ -67,7 +67,7 @@ RESEARCH = ("nfl-model is research only: it does not beat the closing line, so a
             "is a disagreement, not an edge.")
 
 # Site slate uses WSH; nfl-model board uses WAS.
-NFL_TEAM_ALIAS = {"WSH": "WAS", "WAS": "WSH"}
+NFL_TEAM_ALIAS = {"WSH": "WAS", "WAS": "WSH", "LAR": "LA", "LA": "LAR"}
 
 
 def club_keys(code: str) -> set[str]:
@@ -385,11 +385,21 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
     if qb_card:
         items.append(qb_card)
     items += skill_duel_items(a, g)
+    try:
+        season = int(board.get("season") or str(g.get("kickoff_utc", "2026"))[:4])
+        game_week = int(board.get("week") or 1)
+        src = (g.get("scheme_source") or {}).get("week")
+        if src not in (None, ""):
+            game_week = int(src)
+        overlay_week_form(g, season=season, through_week=max(0, game_week - 1))
+    except Exception as exc:
+        print(f"[video-pack] week form unavailable: {exc}")
+
     items += scheme_diagram_items(a, g)
     items += clash_items(a, g, qa, qh)
     items += cover_heat_items(a, g)
     items += injury_items(a, g)
-    items += formation_items(a, g) + player_items(a, g, qbs, props_by_player) + metric_items(a, g)
+    items += player_items(a, g, qbs, props_by_player) + metric_items(a, g)
     try:
         items += last_game_items(a, g)
     except Exception as exc:  # a missing box score should not stop the pack

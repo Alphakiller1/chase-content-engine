@@ -416,20 +416,13 @@ const RULES = [
       const team = (home || !away ? g.home : g.away).toLowerCase();
       return [`last-${team}`];
     } },
-  { keys: ["formation", "lineup", "starters", "offensive line", "o line", "secondary", "front seven", "depth chart"],
-    key: (sent) => {
-      const home = sent.some((w) => homeTokens.includes(w));
-      const away = sent.some((w) => awayTokens.includes(w));
-      const team = (home || !away ? g.home : g.away).toLowerCase();
-      const unit = sent.some((w) => /^defen[sc]|secondary|front/.test(w)) ? "defense" : "offense";
-      return [`formation-${team}-${unit}`];
-    } },
   { keys: playerKeys, key: (sent) => {
       const joined = ` ${sent.join(" ")} `;
       return pack.catalog("vertical").filter((c) => c.group === "players" && joined.includes(` ${playerName(c)} `)).map((c) => c.key);
     } },
   { key: "form-offense", keys: ["offense", "offenses", "offensive", "epa"] },
   { key: "form-defense", keys: ["defense", "defenses", "defensive"] },
+  { key: "form-rushing", keys: ["rushing", "the run", "run game", "run epa", "rush epa", "ground game"] },
   { key: "model", keys: ["model", "projection", "projects", "win probability"] },
   { key: "matchup", keys: ["matchup", "tonight", "kickoff"] },
 ];

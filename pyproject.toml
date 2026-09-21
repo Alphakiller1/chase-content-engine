@@ -9,6 +9,8 @@ description = "Verified Chase Analytics data migration and social graphic genera
 requires-python = ">=3.11"
 dependencies = [
   "Pillow>=10.0",
+  "pandas>=2.2",
+  "pyarrow>=16",
   "tzdata>=2025.2; platform_system == 'Windows'",
 ]
 

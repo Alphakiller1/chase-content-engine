@@ -6,7 +6,7 @@
  *   GAME     matchup · market (spread, total, model) · lines (line-move)
  *   BETTING  props (props-all, props-<team>)
  *   TEAMS    last (last-<team>-passing|rushing|defense) · form · scheme · ranks
- *   PLAYERS  qb · formation (formation-<team>-<unit>) · injuries · players (player-<name>)
+ *   PLAYERS  qb · injuries · players (player-<name>)
  *
  * Shared by scripts/edit.mjs (the auto-edit) and scripts/booth.mjs (the recording
  * booth), so the booth shows exactly what the edit will render.
@@ -28,7 +28,7 @@ export const SECTION = {
   matchup: "Game", market: "Game", lines: "Game",
   props: "Betting",
   last: "Teams", form: "Teams", scheme: "Teams", ranks: "Teams",
-  qb: "Players", formation: "Players", injuries: "Players", players: "Players",
+  qb: "Players", injuries: "Players", players: "Players",
 };
 /** Compositions with a registered 16:9 twin named <id>Wide. */
 const HAS_WIDE = new Set(["StatDuel", "LineGap", "RankCountdown", "Formation", "PlayerCard", "MetricBoard", "BoardMotion", "LineMove", "PropBoard", "LastGame", "TeamCompare", "QbMatchup", "SchemeDiagram", "MixTable", "InjuryBoard", "ClashBoard", "CoverHeat"]);
@@ -129,6 +129,7 @@ export function loadPack(packDir) {
       item("clubs") ? `${item("clubs").props.awaySide?.record ?? ""} vs ${item("clubs").props.homeSide?.record ?? ""}` : "");
     add("form", "Team form", "form-offense", "Offense", "stats-offense", boardNote("stats-offense"));
     add("form", "Team form", "form-defense", "Defense", "stats-defense", boardNote("stats-defense"));
+    add("form", "Team form", "form-rushing", "Rushing", "stats-rushing", boardNote("stats-rushing"));
     add("scheme", "Scheme", "scheme-cover", "Coverage", "scheme-cover",
       item("scheme-cover") ? `${item("scheme-cover").props.awayLook?.shell} vs ${item("scheme-cover").props.homeLook?.shell}` : "");
     add("scheme", "Scheme", "scheme-pack", "Personnel", "scheme-pack",
@@ -160,16 +161,6 @@ export function loadPack(packDir) {
       item("wr-matchup")?.props.note || (item("wr-matchup") ? `${item("wr-matchup").props.awayQb?.name} vs ${item("wr-matchup").props.homeQb?.name}` : ""));
     add("qb", "Skill duels", "rb", "RBs", "rb-matchup",
       item("rb-matchup")?.props.note || (item("rb-matchup") ? `${item("rb-matchup").props.awayQb?.name} vs ${item("rb-matchup").props.homeQb?.name}` : ""));
-    for (const s of ["away", "home"]) {
-      for (const unit of ["offense", "defense"]) {
-        const f = item(`formation-${s}-${unit}`);
-        if (!f) continue;
-        const flagged = f.props.players.filter((p) => p.status && lower(p.status) !== "active");
-        add("formation", "Formations", `formation-${lower(f.props.team)}-${unit}`, `${f.props.team} ${unit}`,
-          `formation-${s}-${unit}`,
-          `${f.props.package} · ${flagged.length ? flagged.map((p) => `${p.name} (${p.status})`).join(", ") : "every starter active"} · click a player to spotlight`);
-      }
-    }
     for (const s of ["away", "home"]) {
       const it = item(`injuries-${s}`);
       if (it) {

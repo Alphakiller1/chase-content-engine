@@ -23,6 +23,7 @@ import time
 from pathlib import Path
 
 from outputs.content_engine import PIPELINE, _fetch
+from outputs.week_form import FORM_SPECS
 
 PLAYERS_DIR = PIPELINE / "video" / "public" / "players"
 FACE_INDEX = PIPELINE / "video" / "props" / ".cache" / "sleeper_faces.json"
@@ -383,7 +384,7 @@ def _form_stat(g: dict, side: str, key: str) -> dict:
     r = ((g.get(f"{side}_form") or {}).get("rates") or {}).get(key) or {}
     if not r or r.get("value") is None:
         return {"value": None, "display": "—", "rank": None, "of": 32, "label": ""}
-    fmt = _epa if "epa" in key else _pct
+    fmt = _epa if "epa" in key else (lambda v: f"{v:.1f}") if "ypc" in key else _pct
     return {
         "value": float(r["value"]),
         "display": fmt(float(r["value"])),
@@ -919,22 +920,34 @@ def metric_items(a, g: dict) -> list[tuple[str, str, dict]]:
             "awayName": g.get("away_name", away), "homeName": g.get("home_name", home)}
     items = []
 
-    def form_board(prefix: str, title: str):
-        keys = [k for k in fa if k.startswith(prefix) and k in fh]
+    def form_board(title: str, keys: list[str]):
+        keys = [k for k in keys if k in fa and k in fh]
         if not keys:
             return None
         rows = []
         for k in keys:
             ra, rh = fa[k], fh[k]
-            fmt = _epa if "epa" in k else _pct
+            fmt = _epa if "epa" in k else (lambda v: f"{v:.1f}") if "ypc" in k else _pct
             rows.append({
                 "label": ra["label"], "better": ra.get("better", "high"),
                 "away": {"value": ra["value"], "display": fmt(ra["value"]), "rank": ra.get("rank"), "of": ra.get("of", 32)},
                 "home": {"value": rh["value"], "display": fmt(rh["value"]), "rank": rh.get("rank"), "of": rh.get("of", 32)},
             })
-        return {**base, "eyebrow": f"{a.tag} · Team form", "title": title, "rows": rows, "mixes": [],
-                "rankKind": "quality",
-                "note": "Opponent-adjusted rates, graded against the 32-team pool (1st = best). Bar length is league percentile."}
+        window = g.get("form_window") or {}
+        through = window.get("through_week")
+        season = window.get("season")
+        if through and season:
+            label = f"Week {through}" if through == 1 else f"Weeks 1–{through}"
+            note = (
+                f"{season} {label} play-by-play, ranked in the 32-team pool (1st = best). "
+                "Not last season's prior. Bar length is league percentile."
+            )
+            eyebrow = f"{a.tag} · Team form · {label}"
+        else:
+            note = "Opponent-adjusted rates, graded against the 32-team pool (1st = best). Bar length is league percentile."
+            eyebrow = f"{a.tag} · Team form"
+        return {**base, "eyebrow": eyebrow, "title": title, "rows": rows, "mixes": [],
+                "rankKind": "quality", "note": note}
 
     def scheme_board(unit: str, cat: str, title: str, labels: dict[str, str], fmt=_pct, mix=None):
         da, dh = (sa.get(unit) or {}).get(cat) or {}, (sh.get(unit) or {}).get(cat) or {}
@@ -960,9 +973,14 @@ def metric_items(a, g: dict) -> list[tuple[str, str, dict]]:
                 "title": title, "rows": rows, "mixes": mixes, "rankKind": "frequency",
                 "note": f"Share of snaps; badge = league frequency rank (1 = most often). {charting_note(g)}"}
 
+    spec_keys = [k for k, _, _, _ in FORM_SPECS]
     boards = {
-        "offense": form_board("off_", "Offense, Side by Side"),
-        "defense": form_board("def_", "Defense, Side by Side"),
+        "offense": form_board("Offense, Side by Side",
+                              [k for k in spec_keys if k.startswith("off_")]),
+        "defense": form_board("Defense, Side by Side",
+                              [k for k in spec_keys if k.startswith("def_")]),
+        "rushing": form_board("Rushing, Side by Side",
+                              [k for k in spec_keys if "rush" in k]),
         "pressure": scheme_board("defense", "pressure", "How They Pressure",
                                  {"blitz_rate": "Blitz rate", "pressure_rate": "Pressure rate",
                                   "stacked_box_rate": "Stacked box", "avg_box": "Avg. men in box"}),
