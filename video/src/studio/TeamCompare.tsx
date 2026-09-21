@@ -5,7 +5,7 @@ import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League, teamAccent } from "../teams";
 import { Count, Fit, Sheen } from "./live";
-import { parseStat, toneFromPair, toneFromRank } from "./statColor";
+import { ordinal, parseStat, toneFromPair, toneFromRank } from "./statColor";
 import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
@@ -76,10 +76,10 @@ export const TeamCompare: React.FC<TeamCompareProps> = ({
     const grow = progress(frame, fps, at + 0.2, 0.8, EASE_DRAW);
     const power = toneFromRank(s.rank, of, "quality");
     const tiles = [
-      { k: "Record", v: s.record || "—", c: toneFromRank(null, of, "identity") },
-      { k: "Rest", v: s.rest || "—", c: toneFromRank(null, of, "count") },
-      { k: "Off. EPA", v: s.offEpa, c: toneFromRank(s.offEpaRank ?? null, of, "quality") },
-      { k: "Def. EPA", v: s.defEpa, c: toneFromRank(s.defEpaRank ?? null, of, "quality", true) },
+      { k: "Record", v: s.record || "—", rank: null as number | null, c: toneFromRank(null, of, "identity") },
+      { k: "Rest", v: s.rest || "—", rank: null, c: toneFromRank(null, of, "count") },
+      { k: "Off. EPA", v: s.offEpa, rank: s.offEpaRank ?? null, c: toneFromRank(s.offEpaRank ?? null, of, "quality") },
+      { k: "Def. EPA", v: s.defEpa, rank: s.defEpaRank ?? null, c: toneFromRank(s.defEpaRank ?? null, of, "quality", true) },
     ];
     return (
       <div
@@ -163,6 +163,9 @@ export const TeamCompare: React.FC<TeamCompareProps> = ({
                 }}
               >
                 {t.v}
+                {t.rank ? (
+                  <span style={{ marginLeft: 8, fontSize: wide ? 22 : 20, fontWeight: 800 }}>{ordinal(t.rank)}</span>
+                ) : null}
               </div>
             </div>
           ))}
