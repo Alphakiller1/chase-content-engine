@@ -52,8 +52,8 @@ export const BoothFrame: React.FC<BoothFrameProps> = ({
 }) => {
   const G = frameGeom(format, platform, mode, camSize, size);
   return (
-    // Transparent: the booth paints the page ground and the live camera UNDER this
-    // player, so the header and captions sit over the camera exactly as in the render.
+    // Transparent: the booth paints the page ground under this player and the live
+    // camera pip over it, so graphics never cover the bubble.
     <AbsoluteFill style={{ background: "transparent", fontFamily: "var(--font-body)" }}>
       {graphic ? (
         <Stage

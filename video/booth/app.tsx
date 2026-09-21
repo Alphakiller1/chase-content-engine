@@ -1038,8 +1038,8 @@ const App: React.FC = () => {
   const cam = CAM[format];
   const G = frameGeom(format, format === "wide" ? "youtube" : platform, mode, cam, size);
   const bubbleWide = format === "wide" && mode === "bubble";
-  const camX = bubbleWide ? 1920 - 36 - (G.cam.w || cam) : G.cam.x;
-  const camY = bubbleWide ? 36 : G.cam.y;
+  const camX = bubbleWide ? 1920 - 48 - (G.cam.w || cam) : G.cam.x;
+  const camY = bubbleWide ? 48 : G.cam.y;
   const ring = teamAccent(cat.game.home, cat.game.league);
   const overlayProps = (what: OverlayKey): Record<string, unknown> => {
     if (what === "bug") {
@@ -1107,6 +1107,23 @@ const App: React.FC = () => {
           <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
             {/* 1. page ground  2. live camera  3. the frame (transparent)  4. ink */}
             <div style={{ position: "absolute", inset: 0, background: "var(--surface-page)" }} />
+            <div ref={playerBoxRef} style={{ position: "absolute", inset: 0, width: W, height: H, zIndex: 1 }}>
+            <Player
+              key={format}
+              ref={playerRef}
+              component={BoothFrame}
+              inputProps={frameProps}
+              durationInFrames={FPS * 60 * 60}
+              fps={FPS}
+              compositionWidth={W}
+              compositionHeight={H}
+              style={{ position: "absolute", inset: 0, width: W, height: H }}
+              autoPlay
+              initiallyMuted
+              initialFrame={startFrame}
+              acknowledgeRemotionLicense
+            />
+            </div>
             <div
               className="cam-box"
               style={{
@@ -1131,23 +1148,6 @@ const App: React.FC = () => {
               {/* Keep WebRTC phone audio playing so MediaRecorder gets samples. This is a live MediaStream, not timeline media. */}
               {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
               <audio ref={phoneAudioRef} autoPlay playsInline style={{ display: "none" }} />
-            </div>
-            <div ref={playerBoxRef} style={{ position: "absolute", inset: 0, width: W, height: H }}>
-            <Player
-              key={format}
-              ref={playerRef}
-              component={BoothFrame}
-              inputProps={frameProps}
-              durationInFrames={FPS * 60 * 60}
-              fps={FPS}
-              compositionWidth={W}
-              compositionHeight={H}
-              style={{ position: "absolute", inset: 0, width: W, height: H }}
-              autoPlay
-              initiallyMuted
-              initialFrame={startFrame}
-              acknowledgeRemotionLicense
-            />
             </div>
             <svg
               ref={svgRef}

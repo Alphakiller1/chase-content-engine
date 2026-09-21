@@ -352,8 +352,10 @@ kbd {
 }
 .cam-box {
   position: absolute;
+  z-index: 6;
   box-sizing: border-box;
   overflow: hidden;
+  pointer-events: none;
   transition: left 450ms cubic-bezier(0.16, 1, 0.3, 1), top 450ms cubic-bezier(0.16, 1, 0.3, 1),
     width 450ms cubic-bezier(0.16, 1, 0.3, 1), height 450ms cubic-bezier(0.16, 1, 0.3, 1),
     border-radius 450ms cubic-bezier(0.16, 1, 0.3, 1), opacity 250ms;
@@ -369,6 +371,7 @@ kbd {
 .ink {
   position: absolute;
   inset: 0;
+  z-index: 7;
   pointer-events: none;
 }
 .ink.drawing {

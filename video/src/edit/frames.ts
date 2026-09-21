@@ -56,7 +56,7 @@ function frameGeomBase(format: "vertical" | "wide", platform: Platform, mode: La
     const W = 1920;
     const H = 1080;
     const cs = camSize;
-    const bubbleCam = { x: W - 36 - cs, y: 36, w: cs, h: cs, r: cs / 2, ring: true };
+    const bubbleCam = { x: W - 48 - cs, y: 48, w: cs, h: cs, r: cs / 2, ring: true };
     const hidden = { x: bubbleCam.x + cs / 2, y: bubbleCam.y + cs / 2, w: 0, h: 0, r: 0, ring: false };
     const none: Insets = { top: 0, right: 0, bottom: 0 };
     if (mode === "split") {
@@ -94,7 +94,7 @@ function frameGeomBase(format: "vertical" | "wide", platform: Platform, mode: La
     }
     return {
       width: W, height: H,
-      stage: { x: 192, y: 28, w: 1536, h: 864, scale: 0.8, visible: true },
+      stage: { x: 72, y: 40, w: 1480, h: 860, scale: 0.78, visible: true },
       insets: none,
       cam: bubbleCam,
       captions: { x: 232, y: 902, w: 1456, h: 158, align: "center", size: 46, lines: 2, plate: false },
