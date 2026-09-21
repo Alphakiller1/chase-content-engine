@@ -259,14 +259,14 @@ const App: React.FC = () => {
   /* catalog */
   useEffect(() => {
     const packsUrl = STATIC ? url("/data/packs.json") : "/api/packs";
-    fetch(packsUrl)
+    fetch(packsUrl, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { packs: [] }))
       .then(async (d: { packs?: PackOpt[]; current?: string }) => {
         const list = d.packs ?? [];
         setPacks(list);
         const current = d.current || list.find((p) => p.active)?.id || list[0]?.id;
         const catUrl = STATIC && current ? url(`/data/packs/${current}/catalog.json`) : "/api/catalog";
-        const r = await fetch(catUrl);
+        const r = await fetch(catUrl, { cache: "no-store" });
         if (!r.ok) throw new Error(await r.text());
         const c: Catalog = await r.json();
         setCat(c);
