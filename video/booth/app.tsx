@@ -1351,7 +1351,7 @@ const App: React.FC = () => {
           <p>{currentVertical?.note || "—"}</p>
           {currentVertical?.composition === "Formation" ? <div className="hint">Click a face to spotlight that player · Esc clears</div> : null}
           <div className="hint">
-            Take shape: 1 matchup → 2 market (say research only) → 8 skill duels → 0 injuries (impact first) → 6 scheme. Other Sunday games in the dropdown.
+            Story shape: matchup → market context (say research only) → skill duels → injuries (impact first) → scheme. This booth is locked to Giants at Rams.
           </div>
           {nextGroup ? <div className="hint">Next (Space): {nextGroup.label}</div> : null}
           <div className="story-spine" aria-label="Suggested story order">
