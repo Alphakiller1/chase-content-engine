@@ -187,6 +187,14 @@ def team_compare_item(a, g: dict, ta: dict, th: dict, bg: dict, spread: str, tot
             "score": f"{score:.1f}",
         }
 
+    window = g.get("form_window") or {}
+    through = window.get("through_week")
+    season = window.get("season")
+    if through and season:
+        span = f"Week {through}" if through == 1 else f"Weeks 1–{through}"
+        epa_note = f"EPA is {season} {span} play-by-play, ranked 1–32. Power rating and projected score are nfl-model (research only)."
+    else:
+        epa_note = "Power rating and EPA are opponent-adjusted (nfl-model, research only)."
     lead = home if model_margin >= 0 else away
     return ("clubs", "TeamCompare", {
         "league": "nfl", "away": away, "home": home,
@@ -199,7 +207,7 @@ def team_compare_item(a, g: dict, ta: dict, th: dict, bg: dict, spread: str, tot
         "modelLine": f"{lead} by {abs(model_margin):.1f} · {model_total:.1f}",
         "awaySide": side(away, ta, {}, float(bg.get("projected_away_score", 0))),
         "homeSide": side(home, th, {}, float(bg.get("projected_home_score", 0))),
-        "note": "Power rating and EPA are opponent-adjusted (nfl-model, research only). Rest and travel from the site slate.",
+        "note": epa_note,
     })
 
 

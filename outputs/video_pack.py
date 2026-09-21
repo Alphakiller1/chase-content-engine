@@ -408,15 +408,6 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
             items += prop_list
     if live and has_model:
         items.append(line_move_item(a, g, live, model_margin, float(bg["projected_total"])))
-    if has_model:
-        items.append(team_compare_item(a, g, ta, th, bg, spread, total, model_margin, float(bg["projected_total"]), kickoff))
-    qb_card = qb_matchup_item(a, g, qa, qh)
-    if qb_card:
-        items.append(qb_card)
-    qb_stress = qb_stress_item(a, g, qa, qh)
-    if qb_stress:
-        items.append(qb_stress)
-    items += skill_duel_items(a, g)
     try:
         season = int(board.get("season") or str(g.get("kickoff_utc", "2026"))[:4])
         game_week = int(board.get("week") or 1)
@@ -426,7 +417,15 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
         overlay_week_form(g, season=season, through_week=max(0, game_week - 1))
     except Exception as exc:
         print(f"[video-pack] week form unavailable: {exc}")
-
+    if has_model:
+        items.append(team_compare_item(a, g, ta, th, bg, spread, total, model_margin, float(bg["projected_total"]), kickoff))
+    qb_card = qb_matchup_item(a, g, qa, qh)
+    if qb_card:
+        items.append(qb_card)
+    qb_stress = qb_stress_item(a, g, qa, qh)
+    if qb_stress:
+        items.append(qb_stress)
+    items += skill_duel_items(a, g)
     items += scheme_diagram_items(a, g)
     items += clash_items(a, g, qa, qh)
     items += cover_heat_items(a, g)
