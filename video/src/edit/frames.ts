@@ -56,7 +56,7 @@ function frameGeomBase(format: "vertical" | "wide", platform: Platform, mode: La
     const W = 1920;
     const H = 1080;
     const cs = camSize;
-    const bubbleCam = { x: W - 28 - cs, y: H - 22 - cs, w: cs, h: cs, r: cs / 2, ring: true };
+    const bubbleCam = { x: W - 28 - cs, y: 22, w: cs, h: cs, r: cs / 2, ring: true };
     const hidden = { x: bubbleCam.x + cs / 2, y: bubbleCam.y + cs / 2, w: 0, h: 0, r: 0, ring: false };
     const none: Insets = { top: 0, right: 0, bottom: 0 };
     if (mode === "split") {
