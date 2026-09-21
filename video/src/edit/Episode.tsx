@@ -44,6 +44,7 @@ import { MixTable } from "../studio/MixTable";
 import { InjuryBoard } from "../studio/InjuryBoard";
 import { ClashBoard } from "../studio/ClashBoard";
 import { CoverHeat } from "../studio/CoverHeat";
+import { QbStressTest } from "../studio/QbStressTest";
 import "../fonts";
 
 /**
@@ -156,6 +157,8 @@ const GRAPHICS: Record<string, React.FC<any>> = {
   ClashBoardWide: ClashBoard,
   CoverHeat,
   CoverHeatWide: CoverHeat,
+  QbStressTest,
+  QbStressTestWide: QbStressTest,
   Ticker,
   CornerBug,
   LowerThird,

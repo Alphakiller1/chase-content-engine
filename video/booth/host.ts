@@ -1,5 +1,7 @@
 /** Hosted vs local booth. esbuild defines BOOTH_STATIC / BOOTH_BASE for GitHub Pages. */
 
+declare const process: { env: Record<string, string | undefined> };
+
 export const STATIC = process.env.BOOTH_STATIC === "1";
 export const BASE = String(process.env.BOOTH_BASE || "").replace(/\/$/, "");
 

@@ -556,6 +556,95 @@ def cover_heat_items(a, g: dict) -> list[tuple[str, str, dict]]:
     return items
 
 
+def qb_stress_item(a, g: dict, qa: dict | None, qh: dict | None) -> tuple[str, str, dict] | None:
+    """Two-QB story board: passing EPA vs the opponent's actual coverage and pressure menu."""
+    away, home = g["away"].upper(), g["home"].upper()
+    collisions = []
+
+    def side(off_side: str, def_side: str, qb: dict | None) -> dict:
+        off_s = g.get(f"{off_side}_scheme") or {}
+        def_s = g.get(f"{def_side}_scheme") or {}
+        off_r = _scheme_unit(off_s, "offense", "response")
+        def_r = _scheme_unit(def_s, "defense", "response")
+        off_lg = (off_s.get("league_response") or {}).get("offense") or {}
+        def_lg = (def_s.get("league_response") or {}).get("defense") or {}
+        def_c = _scheme_unit(def_s, "defense", "coverage")
+        def_p = _scheme_unit(def_s, "defense", "pressure")
+        off_team = g[off_side].upper()
+        def_team = g[def_side].upper()
+        face = _qb_face(g, off_team, qb)
+        qb_name = face["name"]
+        specs = (
+            ("Man coverage", "man", def_c.get("man_rate"), "coverage", "man_rate"),
+            ("Zone coverage", "zone", def_c.get("zone_rate"), "coverage", "zone_rate"),
+            ("Blitz", "blitz", def_p.get("blitz_rate"), "pressure", "blitz_rate"),
+            ("Pressure", "pressure", def_p.get("pressure_rate"), "pressure", "pressure_rate"),
+        )
+        rows = []
+        for label, split, rate, rate_cat, rate_key in specs:
+            epa_key = f"pass_epa_{split}"
+            offense = _epa_stat(off_r.get(epa_key), off_lg.get(epa_key))
+            defense = _epa_stat(def_r.get(epa_key), def_lg.get(epa_key), invert=True)
+            if offense["value"] is None and defense["value"] is None and rate is None:
+                continue
+            rate_rank = _freq_rank(def_s, "defense", rate_cat, rate_key)
+            rows.append({
+                "label": label,
+                "offense": offense,
+                "defenseRate": {
+                    "display": _pct(float(rate)) if rate is not None else "—",
+                    "rank": rate_rank,
+                },
+                "defense": defense,
+            })
+            if offense.get("rank") and defense.get("rank"):
+                gap = int(defense["rank"]) - int(offense["rank"])
+                collisions.append({
+                    "gap": gap,
+                    "score": abs(gap),
+                    "qb": qb_name.split(" ")[-1],
+                    "label": label.lower(),
+                    "off_rank": int(offense["rank"]),
+                    "def_rank": int(defense["rank"]),
+                    "defense": def_team,
+                })
+        yards = ((qb or {}).get("metrics") or {}).get("passing_yards")
+        return {
+            "quarterback": face,
+            "defense": def_team,
+            "defenseName": g.get(f"{def_side}_name", def_team),
+            "projection": f"Model · {float(yards):.0f} pass yds" if yards is not None else "",
+            "rows": rows,
+        }
+
+    away_side = side("away", "home", qa)
+    home_side = side("home", "away", qh)
+    if len(away_side["rows"]) < 2 or len(home_side["rows"]) < 2:
+        return None
+
+    if collisions:
+        key = max(collisions, key=lambda x: x["score"])
+        owner = key["qb"] if key["gap"] > 0 else key["defense"]
+        note = (
+            f"Biggest collision: {key['qb']} vs {key['label']} — passing offense "
+            f"{_ord(key['off_rank'])}, {key['defense']} defense {_ord(key['def_rank'])}. "
+            f"The rank gap points to {owner}."
+        )
+    else:
+        note = "Read frequency first, then performance: a defense's favorite call is not always its best call."
+    note += " EPA is the team passing split; the published starter is shown."
+
+    return ("qb-stress", "QbStressTest", {
+        "league": "nfl", "away": away, "home": home,
+        "awayName": g.get("away_name", away), "homeName": g.get("home_name", home),
+        "eyebrow": f"{a.tag} · Quarterbacks",
+        "title": "Quarterback Stress Test",
+        "note": note,
+        "awaySide": away_side,
+        "homeSide": home_side,
+    })
+
+
 def _num(d: dict, *keys):
     for k in keys:
         v = d.get(k)

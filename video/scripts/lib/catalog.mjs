@@ -31,7 +31,7 @@ export const SECTION = {
   qb: "Players", injuries: "Players", players: "Players",
 };
 /** Compositions with a registered 16:9 twin named <id>Wide. */
-const HAS_WIDE = new Set(["StatDuel", "LineGap", "RankCountdown", "Formation", "PlayerCard", "MetricBoard", "BoardMotion", "LineMove", "PropBoard", "LastGame", "TeamCompare", "QbMatchup", "SchemeDiagram", "MixTable", "InjuryBoard", "ClashBoard", "CoverHeat"]);
+const HAS_WIDE = new Set(["StatDuel", "LineGap", "RankCountdown", "Formation", "PlayerCard", "MetricBoard", "BoardMotion", "LineMove", "PropBoard", "LastGame", "TeamCompare", "QbMatchup", "QbStressTest", "SchemeDiagram", "MixTable", "InjuryBoard", "ClashBoard", "CoverHeat"]);
 
 export function loadPack(packDir) {
   const manifest = JSON.parse(fs.readFileSync(path.join(packDir, "pack.json"), "utf8"));
@@ -157,6 +157,8 @@ export function loadPack(packDir) {
     // ── PLAYERS ──
     add("qb", "Skill duels", "qb", "QBs", "qb-matchup",
       item("qb-matchup")?.props.note || (qbCard ? `${qbCard.awayQb?.name ?? ""} vs ${qbCard.homeQb?.name ?? ""}` : ""));
+    add("qb", "Skill duels", "qb-stress", "QB stress test", "qb-stress",
+      item("qb-stress")?.props.note || "Quarterbacks against the coverage and pressure they will see");
     add("qb", "Skill duels", "wr", "WR1s", "wr-matchup",
       item("wr-matchup")?.props.note || (item("wr-matchup") ? `${item("wr-matchup").props.awayQb?.name} vs ${item("wr-matchup").props.homeQb?.name}` : ""));
     add("qb", "Skill duels", "rb", "RBs", "rb-matchup",
