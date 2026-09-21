@@ -17,7 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { captureProgram, cropProgram, withAudio } from "./composite";
+import { paintBooth, snapshotProgram, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -219,7 +219,7 @@ const App: React.FC = () => {
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
   const playerBoxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const programCapture = useRef<MediaStream | null>(null);
+  const graphicSnap = useRef<HTMLCanvasElement | null>(null);
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -243,6 +243,8 @@ const App: React.FC = () => {
   const group = groups[groupIdx];
   const startFrame = instant ? settleFrame(current) : 0;
   const platform = (platformPref || cat?.platform || "reels") as Plat;
+  const layoutRef = useRef({ format, platform, mode, size, mirror });
+  layoutRef.current = { format, platform, mode, size, mirror };
 
   const say = useCallback((text: string) => setFlash({ text, at: performance.now() }), []);
   const now = () => (performance.now() - t0.current) / 1000;
@@ -740,11 +742,6 @@ const App: React.FC = () => {
     say(`Undone · ${cueLabel(last, byKey)}`);
   }, [byKey, currentKey, say]);
 
-  const stopProgramCapture = () => {
-    programCapture.current?.getTracks().forEach((t) => t.stop());
-    programCapture.current = null;
-  };
-
   /* recording */
   const beginRecording = useCallback(() => {
     if (!stream) return;
@@ -752,40 +749,31 @@ const App: React.FC = () => {
     const recH = format === "wide" ? 1080 : 1920;
     const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-    const chunksStop: Array<() => void> = [];
-    let picture: MediaStream;
-    if (STATIC) {
-      const captured = programCapture.current;
-      const frame = frameRef.current;
-      if (!captured || !frame) {
-        setPhase("error");
-        setMessage("Share this Chrome tab when asked — the take is the booth picture, not a copy of it.");
-        return;
-      }
-      void cropProgram(captured, frame);
-      const view = document.createElement("video");
-      view.srcObject = captured;
-      view.muted = true;
-      view.playsInline = true;
-      void view.play();
-      const canvas = document.createElement("canvas");
-      canvas.width = recW;
-      canvas.height = recH;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      let raf = 0;
-      const paint = () => {
-        if (view.readyState >= 2) ctx.drawImage(view, 0, 0, recW, recH);
-        raf = requestAnimationFrame(paint);
-      };
-      paint();
-      chunksStop.push(() => cancelAnimationFrame(raf));
-      picture = canvas.captureStream(30);
-    } else {
-      picture = new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
-    }
+    const canvas = document.createElement("canvas");
+    canvas.width = recW;
+    canvas.height = recH;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    if (!ctx) return;
+    let raf = 0;
+    let lastPaint = 0;
+    const paint = (t: number) => {
+      raf = requestAnimationFrame(paint);
+      if (!STATIC || t - lastPaint < 32) return;
+      lastPaint = t;
+      const L = layoutRef.current;
+      paintBooth(ctx, {
+        w: recW,
+        h: recH,
+        geom: frameGeom(L.format, L.platform, L.mode, CAM[L.format], L.size),
+        video: videoRef.current,
+        graphicSnap: graphicSnap.current,
+        mirror: L.mirror,
+      });
+    };
+    if (STATIC) raf = requestAnimationFrame(paint);
+    const picture = STATIC ? canvas.captureStream(30) : new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
     const recStream = withAudio(picture, stream);
-    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 192_000 });
+    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
     chunks.current = [];
     strokeStore.current = [];
     nextStrokeId.current = 1;
@@ -805,9 +793,8 @@ const App: React.FC = () => {
       setNonce((n) => n + 1);
     };
     rec.onstop = async () => {
-      chunksStop.forEach((fn) => fn());
+      cancelAnimationFrame(raf);
       recStream.getTracks().forEach((t) => t.stop());
-      stopProgramCapture();
       setPhase("saving");
       const name = stamp();
       try {
@@ -817,7 +804,7 @@ const App: React.FC = () => {
           downloadBlob(`${name}-broadcast.webm`, blob, blob.type);
           setSaved(name);
           setPhase("saved");
-          setMessage("Broadcast take downloaded — this is the booth frame plus your mic.");
+          setMessage("Broadcast take downloaded — graphics, camera, and mic together.");
           return;
         }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
@@ -837,15 +824,14 @@ const App: React.FC = () => {
     };
     recRef.current = rec;
     rec.start(1000);
-  }, [currentKey, format, mode, overlaysOn, size, stream]);
+  }, [currentKey, format, mirror, mode, overlaysOn, platform, size, stream]);
 
-  const toggleRecord = useCallback(async () => {
+  const toggleRecord = useCallback(() => {
     if (phase === "recording") {
       recRef.current?.stop();
       return;
     }
     if (phase === "countdown") {
-      stopProgramCapture();
       setPhase("idle");
       say("Countdown cancelled");
       return;
@@ -853,20 +839,6 @@ const App: React.FC = () => {
     if (phase === "saving" || !stream) return;
     if (micId === "phone" && (!phoneTrack || !stream.getAudioTracks().length)) {
       return say("Phone mic is not in the recorder yet — wait until it says Phone mic live");
-    }
-    if (STATIC) {
-      const frame = frameRef.current;
-      if (!frame) return say("Program frame is not ready");
-      try {
-        say("Share this tab so the take is the booth, not a copy");
-        const captured = await captureProgram(frame);
-        programCapture.current = captured;
-        captured.getVideoTracks()[0]?.addEventListener("ended", () => recRef.current?.stop());
-      } catch {
-        stopProgramCapture();
-        say("Tab share was cancelled — Chrome has to capture this tab for the take to match");
-        return;
-      }
     }
     setCount(3);
     setPhase("countdown");
@@ -881,6 +853,26 @@ const App: React.FC = () => {
     const id = setTimeout(() => setCount((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [beginRecording, count, phase]);
+
+  useEffect(() => {
+    if (!STATIC || phase !== "recording") return;
+    const el = playerBoxRef.current;
+    if (!el) return;
+    const w = format === "wide" ? 1920 : 1080;
+    const h = format === "wide" ? 1080 : 1920;
+    let alive = true;
+    const take = () => {
+      snapshotProgram(el, w, h).then((shot) => {
+        if (alive) graphicSnap.current = shot;
+      });
+    };
+    take();
+    const again = window.setTimeout(take, 1400);
+    return () => {
+      alive = false;
+      clearTimeout(again);
+    };
+  }, [phase, currentKey, mode, size, overlaysOn, format, nonce]);
 
   const makeVideo = useCallback(async () => {
     const r = await fetch(`/api/edit?name=${saved}&ext=webm&platform=${platform}`, { method: "POST" });
@@ -1291,7 +1283,7 @@ const App: React.FC = () => {
               <span>
                 {stream
                   ? STATIC
-                    ? "Record asks Chrome to share this tab, then saves the booth you see plus your mic."
+                    ? "Record saves the board plus your camera and mic. Switching graphics takes a still of the new board."
                     : "Record downloads the camera take and live graphic cues."
                   : "Explore every graphic now. Enable your devices when you are ready to record."}
               </span>
