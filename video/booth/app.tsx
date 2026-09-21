@@ -17,7 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { captureProgram, withAudio } from "./composite";
+import { captureProgram, cropProgram, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -219,6 +219,7 @@ const App: React.FC = () => {
   const playerBoxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const programCapture = useRef<MediaStream | null>(null);
+  const [programLive, setProgramLive] = useState(false);
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -779,6 +780,7 @@ const App: React.FC = () => {
       recStream.getTracks().forEach((t) => t.stop());
       programCapture.current?.getTracks().forEach((t) => t.stop());
       programCapture.current = null;
+      setProgramLive(false);
       setPhase("saving");
       const name = stamp();
       try {
@@ -818,6 +820,7 @@ const App: React.FC = () => {
     if (phase === "countdown") {
       programCapture.current?.getTracks().forEach((t) => t.stop());
       programCapture.current = null;
+      setProgramLive(false);
       setPhase("idle");
       say("Countdown cancelled");
       return;
@@ -833,10 +836,12 @@ const App: React.FC = () => {
         say("Share this tab — that is the booth picture");
         const captured = await captureProgram(frame);
         programCapture.current = captured;
+        setProgramLive(true);
         captured.getVideoTracks()[0]?.addEventListener("ended", () => recRef.current?.stop());
       } catch {
         programCapture.current?.getTracks().forEach((t) => t.stop());
         programCapture.current = null;
+        setProgramLive(false);
         say("Tab share cancelled — the take cannot match the boards without it");
         return;
       }
@@ -857,6 +862,11 @@ const App: React.FC = () => {
     return () => clearTimeout(id);
   }, [beginRecording, count, phase]);
 
+  useEffect(() => {
+    if (!programLive || !programCapture.current || !frameRef.current) return;
+    void cropProgram(programCapture.current, frameRef.current);
+  }, [programLive, currentKey, mode, size, format]);
+
   const makeVideo = useCallback(async () => {
     const r = await fetch(`/api/edit?name=${saved}&ext=webm&platform=${platform}`, { method: "POST" });
     setMessage(r.ok ? "Editing started in a new window - your videos open when it finishes." : `Could not start: ${await r.text()}`);
@@ -866,6 +876,7 @@ const App: React.FC = () => {
   const W = format === "wide" ? 1920 : 1080;
   const H = format === "wide" ? 1080 : 1920;
   const [stageEl, scale] = useFit(W, H);
+  const showScale = programLive ? 1 : scale;
   const drawActive = pen;
   const press = useRef<{ x: number; y: number; id: number } | null>(null);
   const toFrame = (e: React.PointerEvent) => {
@@ -1084,8 +1095,8 @@ const App: React.FC = () => {
             Click here so the booth can hear your keys
           </div>
         ) : null}
-        <div ref={frameRef} className="frame" style={{ width: W * scale, height: H * scale }}>
-          <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
+        <div ref={frameRef} className="frame" style={{ width: W * showScale, height: H * showScale, overflow: "hidden" }}>
+          <div style={{ width: W, height: H, transform: showScale === 1 ? undefined : `scale(${showScale})`, transformOrigin: "0 0", position: "relative" }}>
             {/* 1. page ground  2. live camera  3. the frame (transparent)  4. ink */}
             <div style={{ position: "absolute", inset: 0, background: "var(--surface-page)" }} />
             <div
@@ -1151,7 +1162,7 @@ const App: React.FC = () => {
             </svg>
           </div>
           {format === "vertical" && showZones ? (
-            <div className="zone" style={{ height: SAFE_BOTTOM[platform] * scale, width: W * scale }}>
+            <div className="zone" style={{ height: SAFE_BOTTOM[platform] * showScale, width: W * showScale }}>
               <span>Covered by {platform === "tiktok" ? "TikTok" : platform === "shorts" ? "YouTube" : "Instagram"}&apos;s buttons and caption</span>
             </div>
           ) : null}
@@ -1159,19 +1170,19 @@ const App: React.FC = () => {
             <div
               className="live-caps"
               style={{
-                left: G.captions.x * scale,
-                top: G.captions.y * scale,
-                width: G.captions.w * scale,
-                height: G.captions.h * scale,
+                left: G.captions.x * showScale,
+                top: G.captions.y * showScale,
+                width: G.captions.w * showScale,
+                height: G.captions.h * showScale,
                 justifyContent: G.captions.align === "center" ? "center" : "flex-start",
               }}
             >
               <div
                 style={{
-                  fontSize: G.captions.size * scale,
+                  fontSize: G.captions.size * showScale,
                   textAlign: G.captions.align,
                   WebkitLineClamp: G.captions.lines,
-                  ...(G.captions.plate ? { background: "rgba(5,5,6,.78)", padding: `${10 * scale}px ${22 * scale}px`, borderRadius: 14 * scale } : {}),
+                  ...(G.captions.plate ? { background: "rgba(5,5,6,.78)", padding: `${10 * showScale}px ${22 * showScale}px`, borderRadius: 14 * showScale } : {}),
                 }}
               >
                 {(() => {

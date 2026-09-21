@@ -1,13 +1,12 @@
 /**
- * Hosted broadcast records the program frame on screen (this tab, cropped to
- * the booth picture). That is the only way the file matches the boards.
- * Microphone is mixed in separately. Do not snapshot or rebuild graphics.
+ * Hosted broadcast records this Chrome tab, cropped to the program frame.
+ * That stream is live — graphic clicks must appear in the file.
+ * Do not snapshot boards or capture a transformed layer (it freezes).
  */
 export const captureProgram = async (el: HTMLElement): Promise<MediaStream> => {
   const w = window as unknown as {
     CaptureController?: new () => { setFocusBehavior?: (b: string) => void };
     CropTarget?: { fromElement: (node: Element) => Promise<unknown> };
-    RestrictionTarget?: { fromElement: (node: Element) => Promise<unknown> };
   };
   const controller = w.CaptureController ? new w.CaptureController() : undefined;
   try {
@@ -24,20 +23,15 @@ export const captureProgram = async (el: HTMLElement): Promise<MediaStream> => {
     monitorTypeSurfaces: "exclude",
     ...(controller ? { controller } : {}),
   } as DisplayMediaStreamOptions);
-  const track = display.getVideoTracks()[0] as MediaStreamTrack & {
-    cropTo?: (t: unknown) => Promise<void>;
-    restrictTo?: (t: unknown) => Promise<void>;
-  };
-  try {
-    if (w.RestrictionTarget && track.restrictTo) {
-      await track.restrictTo(await w.RestrictionTarget.fromElement(el));
-    } else if (w.CropTarget && track.cropTo) {
-      await track.cropTo(await w.CropTarget.fromElement(el));
-    }
-  } catch {
-    /* full tab is still the booth picture, including chrome */
-  }
+  await cropProgram(display, el);
   return display;
+};
+
+export const cropProgram = async (stream: MediaStream, el: HTMLElement) => {
+  const CropTarget = (window as unknown as { CropTarget?: { fromElement: (node: Element) => Promise<unknown> } }).CropTarget;
+  const track = stream.getVideoTracks()[0] as MediaStreamTrack & { cropTo?: (t: unknown) => Promise<void> };
+  if (!CropTarget || !track?.cropTo) return;
+  await track.cropTo(await CropTarget.fromElement(el));
 };
 
 export const withAudio = (video: MediaStream, voice: MediaStream | null) => {
