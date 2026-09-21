@@ -17,7 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { paintBooth, snapshotProgram, withAudio } from "./composite";
+import { withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -191,7 +191,6 @@ const App: React.FC = () => {
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [count, setCount] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
   const [cues, setCues] = useState<Cue[]>([]);
   const [saved, setSaved] = useState("");
   const [message, setMessage] = useState("");
@@ -219,7 +218,6 @@ const App: React.FC = () => {
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
   const playerBoxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const graphicSnap = useRef<HTMLCanvasElement | null>(null);
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -243,8 +241,6 @@ const App: React.FC = () => {
   const group = groups[groupIdx];
   const startFrame = instant ? settleFrame(current) : 0;
   const platform = (platformPref || cat?.platform || "reels") as Plat;
-  const layoutRef = useRef({ format, platform, mode, size, mirror });
-  layoutRef.current = { format, platform, mode, size, mirror };
 
   const say = useCallback((text: string) => setFlash({ text, at: performance.now() }), []);
   const now = () => (performance.now() - t0.current) / 1000;
@@ -584,7 +580,14 @@ const App: React.FC = () => {
   }, [flash.at]);
   useEffect(() => {
     if (!recording) return;
-    const id = setInterval(() => setElapsed(now()), 250);
+    const tick = () => {
+      const t = clock(now());
+      document.querySelectorAll("[data-rec-clock]").forEach((n) => {
+        n.textContent = t;
+      });
+    };
+    tick();
+    const id = setInterval(tick, 250);
     return () => clearInterval(id);
   }, [recording]);
 
@@ -745,35 +748,11 @@ const App: React.FC = () => {
   /* recording */
   const beginRecording = useCallback(() => {
     if (!stream) return;
-    const recW = format === "wide" ? 1920 : 1080;
-    const recH = format === "wide" ? 1080 : 1920;
-    const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+    const types = ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp9,opus", "video/webm"];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-    const canvas = document.createElement("canvas");
-    canvas.width = recW;
-    canvas.height = recH;
-    const ctx = canvas.getContext("2d", { alpha: false });
-    if (!ctx) return;
-    let raf = 0;
-    let lastPaint = 0;
-    const paint = (t: number) => {
-      raf = requestAnimationFrame(paint);
-      if (!STATIC || t - lastPaint < 32) return;
-      lastPaint = t;
-      const L = layoutRef.current;
-      paintBooth(ctx, {
-        w: recW,
-        h: recH,
-        geom: frameGeom(L.format, L.platform, L.mode, CAM[L.format], L.size),
-        video: videoRef.current,
-        graphicSnap: graphicSnap.current,
-        mirror: L.mirror,
-      });
-    };
-    if (STATIC) raf = requestAnimationFrame(paint);
-    const picture = STATIC ? canvas.captureStream(30) : new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
+    const picture = new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
     const recStream = withAudio(picture, stream);
-    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 192_000 });
+    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 160_000 });
     chunks.current = [];
     strokeStore.current = [];
     nextStrokeId.current = 1;
@@ -787,13 +766,10 @@ const App: React.FC = () => {
       if (size !== "full") cuesRef.current.push({ t: 0, cmd: "size", arg: size });
       for (const o of overlaysOn) cuesRef.current.push({ t: 0, cmd: "overlay", arg: `${o} on` });
       setCues([...cuesRef.current]);
-      setElapsed(0);
       setPhase("recording");
       setStrokes([]);
-      setNonce((n) => n + 1);
     };
     rec.onstop = async () => {
-      cancelAnimationFrame(raf);
       recStream.getTracks().forEach((t) => t.stop());
       setPhase("saving");
       const name = stamp();
@@ -824,7 +800,7 @@ const App: React.FC = () => {
     };
     recRef.current = rec;
     rec.start(1000);
-  }, [currentKey, format, mirror, mode, overlaysOn, platform, size, stream]);
+  }, [currentKey, mode, overlaysOn, size, stream]);
 
   const toggleRecord = useCallback(() => {
     if (phase === "recording") {
@@ -853,26 +829,6 @@ const App: React.FC = () => {
     const id = setTimeout(() => setCount((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [beginRecording, count, phase]);
-
-  useEffect(() => {
-    if (!STATIC || phase !== "recording") return;
-    const el = playerBoxRef.current;
-    if (!el) return;
-    const w = format === "wide" ? 1920 : 1080;
-    const h = format === "wide" ? 1080 : 1920;
-    let alive = true;
-    const take = () => {
-      snapshotProgram(el, w, h).then((shot) => {
-        if (alive) graphicSnap.current = shot;
-      });
-    };
-    take();
-    const again = window.setTimeout(take, 1400);
-    return () => {
-      alive = false;
-      clearTimeout(again);
-    };
-  }, [phase, currentKey, mode, size, overlaysOn, format, nonce]);
 
   const makeVideo = useCallback(async () => {
     const r = await fetch(`/api/edit?name=${saved}&ext=webm&platform=${platform}`, { method: "POST" });
@@ -1202,7 +1158,7 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : null}
-          {recording ? <div className="rec-badge">● REC {clock(elapsed)}</div> : null}
+          {recording ? <div className="rec-badge">● REC <span data-rec-clock>0:00</span></div> : null}
           {flash.text ? <div className="flash">{flash.text}</div> : null}
           {phase === "countdown" ? <div className="countdown">{count || ""}</div> : null}
         </div>
@@ -1283,7 +1239,7 @@ const App: React.FC = () => {
               <span>
                 {stream
                   ? STATIC
-                    ? "Record saves the board plus your camera and mic. Switching graphics takes a still of the new board."
+                    ? "Record saves camera and mic. Boards stay live on screen — they are not re-encoded while you talk."
                     : "Record downloads the camera take and live graphic cues."
                   : "Explore every graphic now. Enable your devices when you are ready to record."}
               </span>
@@ -1299,7 +1255,7 @@ const App: React.FC = () => {
             </button>
           ) : recording ? (
             <button className="big stop" onClick={toggleRecord}>
-              ■ Stop · {clock(elapsed)} <kbd>R</kbd>
+              ■ Stop · <span data-rec-clock>0:00</span> <kbd>R</kbd>
             </button>
           ) : phase === "countdown" ? (
             <button className="big rec" onClick={toggleRecord}>
