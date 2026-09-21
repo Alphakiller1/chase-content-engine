@@ -204,8 +204,13 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
     away, home = g["away"].upper(), g["home"].upper()
     bg = next((x for x in board.get("games", [])
                if x["away"].upper() in club_keys(away) and x["home"].upper() in club_keys(home)), None)
+    has_model = bg is not None
     if bg is None:
-        fail(f"{away}@{home} is not on the nfl-model board (week {board.get('week')})")
+        # The public slate can publish a standalone prime-time game before the
+        # research board adds it. Build the matchup from slate/scheme data and
+        # omit model-only slides instead of blocking the entire broadcast pack.
+        print(f"[video-pack] {away}@{home} is not on the nfl-model board; building slate-only graphics")
+        bg = {}
     teams = {t["team"].upper(): t for t in board.get("teams", [])}
     ta, th = club_get(teams, away, {}), club_get(teams, home, {})
     book = bg.get("book") or {}
@@ -229,7 +234,9 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
     moneyline = (f"{home} {ml_home:+g}" if ml_home is not None and ml_home < 0
                  else f"{away} {ml_away:+g}" if ml_away is not None else "")
     total = f"{book.get('total'):g}" if book.get("total") is not None else ""
-    lines_note = (f"Lines: DraftKings {'live (ESPN feed)' if book.get('live') else 'via the nfl-model board'}, "
+    line_source = ("live (ESPN feed)" if book.get("live") else
+                   "via the nfl-model board" if has_model else "from the live slate")
+    lines_note = (f"Lines: DraftKings {line_source}, "
                   f"{str(book.get('last_update', board.get('generated_at_utc', '')))[:16].replace('T', ' ')} UTC.")
 
     qbs = {}
@@ -239,10 +246,11 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
             qbs[p["team"]] = p
     qa, qh = club_get(qbs, away), club_get(qbs, home)
     fa, fh = ta.get("form", {}), th.get("form", {})
-    model_margin = float(bg["model_margin"])
-    market_margin = float(book["margin"]) if book.get("live") else float(bg["published_margin"])
-    market_total = (float(book["total"]) if book.get("live") and book.get("total") is not None
-                    else float(bg["market_total"]))
+    model_margin = float(bg["model_margin"]) if has_model else None
+    market_margin = (float(book["margin"]) if book.get("margin") is not None
+                     else float(bg["published_margin"]) if has_model else None)
+    market_total = (float(book["total"]) if book.get("total") is not None
+                    else float(bg["market_total"]) if has_model else None)
     items: list[tuple[str, str, dict]] = []
     base = {"league": "nfl", "away": away, "home": home}
     P = a.platform
@@ -279,40 +287,41 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
             "value": f"{q['metrics']['passing_yards']:.1f}",
             "sub": f"{q['player_name']} · nfl-model centre", "team": team, "league": "nfl"}))
 
-    cut = {**base, "awayRating": round(float(ta.get("rating", 0)), 1),
-           "homeRating": round(float(th.get("rating", 0)), 1),
-           "modelMargin": r1(model_margin), "marketMargin": r1(market_margin),
-           "winProbability": round(float(bg.get("model_win_probability", bg["win_probability"])), 4),
-           "projectedTotal": round(float(bg["projected_total"]), 1),
-           "marketTotal": round(market_total, 1),
-           "projectedAwayScore": round(float(bg["projected_away_score"]), 1),
-           "projectedHomeScore": round(float(bg["projected_home_score"]), 1),
-           "kickoff": kickoff, "action": bg.get("action", "MONITOR"),
-           "edgeWithheld": bg.get("edge_points") is None,
-           "authority": bg.get("authority", board.get("authority", "RESEARCH_ONLY"))}
-    if a.take:
-        cut["take"] = a.take
-    items.append(("cutaway", "NflCutaway", cut))
-    items.append(("model-snapshot", "ModelSnapshot", {
-        **base, "modelMargin": cut["modelMargin"], "marketMargin": cut["marketMargin"],
-        "modelTotal": cut["projectedTotal"], "marketTotal": cut["marketTotal"],
-        "winProbability": cut["winProbability"], "edgeWithheld": cut["edgeWithheld"],
-        "action": cut["action"]}))
+    if has_model:
+        cut = {**base, "awayRating": round(float(ta.get("rating", 0)), 1),
+               "homeRating": round(float(th.get("rating", 0)), 1),
+               "modelMargin": r1(model_margin), "marketMargin": r1(market_margin),
+               "winProbability": round(float(bg.get("model_win_probability", bg["win_probability"])), 4),
+               "projectedTotal": round(float(bg["projected_total"]), 1),
+               "marketTotal": round(market_total, 1),
+               "projectedAwayScore": round(float(bg["projected_away_score"]), 1),
+               "projectedHomeScore": round(float(bg["projected_home_score"]), 1),
+               "kickoff": kickoff, "action": bg.get("action", "MONITOR"),
+               "edgeWithheld": bg.get("edge_points") is None,
+               "authority": bg.get("authority", board.get("authority", "RESEARCH_ONLY"))}
+        if a.take:
+            cut["take"] = a.take
+        items.append(("cutaway", "NflCutaway", cut))
+        items.append(("model-snapshot", "ModelSnapshot", {
+            **base, "modelMargin": cut["modelMargin"], "marketMargin": cut["marketMargin"],
+            "modelTotal": cut["projectedTotal"], "marketTotal": cut["marketTotal"],
+            "winProbability": cut["winProbability"], "edgeWithheld": cut["edgeWithheld"],
+            "action": cut["action"]}))
 
-    gap_total = {**base, "platform": P, "eyebrow": f"{a.tag} · Game total",
-                 "title": "Market vs Model", "measure": "Points, both teams",
-                 "markers": [{"label": "DraftKings", "value": market_total, "kind": "market"},
-                             {"label": "Model", "value": round(float(bg["projected_total"]), 1), "kind": "model"}],
-                 "unit": "pts", "caveat": RESEARCH}
-    gap_margin = {**base, "platform": P, "eyebrow": f"{a.tag} · Spread",
-                  "title": "Spread Projection",
-                  "measure": f"{home} margin (points)",
-                  "markers": [{"label": "DraftKings", "value": round(market_margin, 1), "kind": "market"},
-                              {"label": "Model", "value": r1(model_margin), "kind": "model"}],
-                  "unit": "pts", "caveat": RESEARCH}
-    for name, props in (("gap-total", gap_total), ("gap-margin", gap_margin)):
-        items.append((name, "LineGap", props))
-        items.append((name + "-wide", "LineGapWide", {**props, "platform": "youtube"}))
+        gap_total = {**base, "platform": P, "eyebrow": f"{a.tag} · Game total",
+                     "title": "Market vs Model", "measure": "Points, both teams",
+                     "markers": [{"label": "DraftKings", "value": market_total, "kind": "market"},
+                                 {"label": "Model", "value": round(float(bg["projected_total"]), 1), "kind": "model"}],
+                     "unit": "pts", "caveat": RESEARCH}
+        gap_margin = {**base, "platform": P, "eyebrow": f"{a.tag} · Spread",
+                      "title": "Spread Projection",
+                      "measure": f"{home} margin (points)",
+                      "markers": [{"label": "DraftKings", "value": round(market_margin, 1), "kind": "market"},
+                                  {"label": "Model", "value": r1(model_margin), "kind": "model"}],
+                      "unit": "pts", "caveat": RESEARCH}
+        for name, props in (("gap-total", gap_total), ("gap-margin", gap_margin)):
+            items.append((name, "LineGap", props))
+            items.append((name + "-wide", "LineGapWide", {**props, "platform": "youtube"}))
 
     ranked = sorted(board.get("teams", []), key=lambda t: t["rank"])
     top = max((t["rating"] for t in ranked), default=1) or 1
@@ -351,23 +360,24 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
              "note": f"{away} {ml_away:+g}" if ml_away is not None and fav == home else ""} if moneyline else None,
         ) if s],
         "footer": lines_note}))
-    items.append(("split-model", "SplitFrame", {
-        **base, "camera": "right", "eyebrow": "nfl-model · research only", "title": "The Model",
-        "kickoff": kickoff,
-        "stats": [
-            {"label": "Model margin", "value": by_margin(away, home, model_margin),
-             "team": home if model_margin >= 0 else away},
-            {"label": "Model total", "value": f"{float(bg['projected_total']):.1f}"},
-            {"label": f"{home} win probability", "value": f"{float(bg.get('model_win_probability', 0)) * 100:.0f}%",
-             "note": f"market {float(bg.get('market_fair_home', 0)) * 100:.0f}%"},
-        ],
-        "bullets": [bg.get("edge_withheld_reason") or RESEARCH],
-        "footer": f"Board generated {board.get('generated_at_utc', '')[:16].replace('T', ' ')} UTC."}))
+    if has_model:
+        items.append(("split-model", "SplitFrame", {
+            **base, "camera": "right", "eyebrow": "nfl-model · research only", "title": "The Model",
+            "kickoff": kickoff,
+            "stats": [
+                {"label": "Model margin", "value": by_margin(away, home, model_margin),
+                 "team": home if model_margin >= 0 else away},
+                {"label": "Model total", "value": f"{float(bg['projected_total']):.1f}"},
+                {"label": f"{home} win probability", "value": f"{float(bg.get('model_win_probability', 0)) * 100:.0f}%",
+                 "note": f"market {float(bg.get('market_fair_home', 0)) * 100:.0f}%"},
+            ],
+            "bullets": [bg.get("edge_withheld_reason") or RESEARCH],
+            "footer": f"Board generated {board.get('generated_at_utc', '')[:16].replace('T', ' ')} UTC."}))
     items.append(("end-screen", "EndScreen", {"guides": False}))
     items.append(("end-screen-guides", "EndScreen", {"guides": True}))
 
     thumb = {**base, "line1": f"{g.get('away_name', away).split(' ')[-1]} at {g.get('home_name', home).split(' ')[-1]}",
-             "line2": a.thumb or "Market vs Model", "badge": a.tag}
+             "line2": a.thumb or ("Market vs Model" if has_model else "Matchup Breakdown"), "badge": a.tag}
     items.append(("thumbnail", "Thumbnail", thumb))
     items.append(("thumbnail-vertical", "ThumbnailVertical", thumb))
 
@@ -379,9 +389,10 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
         if live_props:
             prop_list, props_by_player = prop_items(a, g, board, live_props)
             items += prop_list
-    if live:
+    if live and has_model:
         items.append(line_move_item(a, g, live, model_margin, float(bg["projected_total"])))
-    items.append(team_compare_item(a, g, ta, th, bg, spread, total, model_margin, float(bg["projected_total"]), kickoff))
+    if has_model:
+        items.append(team_compare_item(a, g, ta, th, bg, spread, total, model_margin, float(bg["projected_total"]), kickoff))
     qb_card = qb_matchup_item(a, g, qa, qh)
     if qb_card:
         items.append(qb_card)
@@ -400,7 +411,7 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
         print(f"[video-pack] last-game stats unavailable: {exc}")
 
     meta = {"league": "nfl", "away": away, "home": home, "kickoff": kickoff, "week": week,
-            "board_generated": board.get("generated_at_utc"), "book_update": book.get("last_update"),
+            "board_generated": board.get("generated_at_utc") if has_model else None, "book_update": book.get("last_update"),
             "site_slate_game": g.get("id"), "live": bool(book.get("live")),
             "line": " · ".join(x for x in (spread, f"O/U {total}" if total else "") if x)}
     return items, meta
