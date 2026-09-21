@@ -422,7 +422,8 @@ const RULES = [
     } },
   { key: "form-offense", keys: ["offense", "offenses", "offensive", "epa"] },
   { key: "form-defense", keys: ["defense", "defenses", "defensive"] },
-  { key: "form-rushing", keys: ["rushing", "the run", "run game", "run epa", "rush epa", "ground game"] },
+  { key: "form-rush-offense", keys: ["rush offense", "run offense", "rushing offense", "ground game", "run game"] },
+  { key: "form-rush-defense", keys: ["rush defense", "run defense", "rushing defense", "against the run", "vs the run"] },
   { key: "model", keys: ["model", "projection", "projects", "win probability"] },
   { key: "matchup", keys: ["matchup", "tonight", "kickoff"] },
 ];

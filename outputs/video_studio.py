@@ -1085,11 +1085,13 @@ def metric_items(a, g: dict) -> list[tuple[str, str, dict]]:
     spec_keys = [k for k, _, _, _ in FORM_SPECS]
     boards = {
         "offense": form_board("Offense, Side by Side",
-                              [k for k in spec_keys if k.startswith("off_")]),
+                              [k for k in spec_keys if k.startswith("off_") and "rush" not in k]),
         "defense": form_board("Defense, Side by Side",
-                              [k for k in spec_keys if k.startswith("def_")]),
-        "rushing": form_board("Rushing, Side by Side",
-                              [k for k in spec_keys if "rush" in k]),
+                              [k for k in spec_keys if k.startswith("def_") and "rush" not in k]),
+        "rush-offense": form_board("Rush Offense, Side by Side",
+                                   [k for k in spec_keys if k.startswith("off_rush")]),
+        "rush-defense": form_board("Rush Defense, Side by Side",
+                                   [k for k in spec_keys if k.startswith("def_rush")]),
         "pressure": scheme_board("defense", "pressure", "How They Pressure",
                                  {"blitz_rate": "Blitz rate", "pressure_rate": "Pressure rate",
                                   "stacked_box_rate": "Stacked box", "avg_box": "Avg. men in box"}),

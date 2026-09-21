@@ -129,7 +129,8 @@ export function loadPack(packDir) {
       item("clubs") ? `${item("clubs").props.awaySide?.record ?? ""} vs ${item("clubs").props.homeSide?.record ?? ""}` : "");
     add("form", "Team form", "form-offense", "Offense", "stats-offense", boardNote("stats-offense"));
     add("form", "Team form", "form-defense", "Defense", "stats-defense", boardNote("stats-defense"));
-    add("form", "Team form", "form-rushing", "Rushing", "stats-rushing", boardNote("stats-rushing"));
+    add("form", "Team form", "form-rush-offense", "Rush offense", "stats-rush-offense", boardNote("stats-rush-offense"));
+    add("form", "Team form", "form-rush-defense", "Rush defense", "stats-rush-defense", boardNote("stats-rush-defense"));
     add("scheme", "Scheme", "scheme-cover", "Coverage", "scheme-cover",
       item("scheme-cover") ? `${item("scheme-cover").props.awayLook?.shell} vs ${item("scheme-cover").props.homeLook?.shell}` : "");
     add("scheme", "Scheme", "scheme-pack", "Personnel", "scheme-pack",
