@@ -218,6 +218,7 @@ const App: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
   const playerBoxRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -754,10 +755,10 @@ const App: React.FC = () => {
     let snapBusy = false;
     let graphicSnap: HTMLCanvasElement | null = null;
     const paint = () => {
-      const graphicRoot = playerBoxRef.current;
-      if (STATIC && graphicRoot && !snapBusy) {
+      const frame = frameRef.current;
+      if (STATIC && frame && !snapBusy) {
         snapBusy = true;
-        rasterizeGraphic(graphicRoot, recW, recH)
+        rasterizeGraphic(frame, recW, recH)
           .then((shot) => {
             graphicSnap = shot;
           })
@@ -773,7 +774,6 @@ const App: React.FC = () => {
         h: recH,
         geom: frameGeom(format, platform, mode, CAM[format], size),
         video: videoRef.current,
-        graphicRoot,
         graphicSnap,
         mirror,
       });
@@ -1091,7 +1091,7 @@ const App: React.FC = () => {
           </div>
         ) : null}
         <div className="frame" style={{ width: W * scale, height: H * scale }}>
-          <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
+          <div ref={frameRef} style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
             {/* 1. page ground  2. live camera  3. the frame (transparent)  4. ink */}
             <div style={{ position: "absolute", inset: 0, background: "var(--surface-page)" }} />
             <div

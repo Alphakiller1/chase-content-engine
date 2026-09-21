@@ -45,54 +45,68 @@ const drawCover = (
   ctx.restore();
 };
 
-const mapRect = (el: Element, origin: DOMRect, frameW: number, frameH: number) => {
-  const r = el.getBoundingClientRect();
-  if (r.width < 2 || r.height < 2 || !origin.width || !origin.height) return null;
-  const style = getComputedStyle(el);
-  if (style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) return null;
-  const w = (r.width / origin.width) * frameW;
-  const h = (r.height / origin.height) * frameH;
-  // A nested logo bitmap is often 1000px+; the on-screen box is ~80px. Never let
-  // a source fill the program frame unless it actually occupies that much of the booth.
-  if (w > frameW * 0.55 && h > frameH * 0.55) return null;
-  return {
-    x: ((r.left - origin.left) / origin.width) * frameW,
-    y: ((r.top - origin.top) / origin.height) * frameH,
-    w,
-    h,
-  };
-};
-
-/** Draw logos/images at the size they occupy on the booth, never at PNG pixel size. */
-export const drawGraphicLayers = (ctx: CanvasRenderingContext2D, root: HTMLElement, frameW: number, frameH: number) => {
-  const origin = root.getBoundingClientRect();
-  for (const el of root.querySelectorAll("canvas, img")) {
-    const box = mapRect(el, origin, frameW, frameH);
-    if (!box) continue;
+/** html-to-image clones canvases at PNG pixel size. Swap in CSS-sized images for the snapshot. */
+const withDisplaySizedBitmaps = async (root: HTMLElement, run: () => Promise<HTMLCanvasElement>) => {
+  const inserted: HTMLElement[] = [];
+  const hidden: HTMLCanvasElement[] = [];
+  for (const canvas of root.querySelectorAll("canvas")) {
+    const cw = canvas.clientWidth;
+    const ch = canvas.clientHeight;
+    if (cw < 2 || ch < 2) continue;
+    let src = "";
     try {
-      ctx.drawImage(el as CanvasImageSource, box.x, box.y, box.w, box.h);
+      src = canvas.toDataURL("image/png");
     } catch {
-      /* tainted or zero-size source */
+      continue;
     }
+    const img = document.createElement("img");
+    img.src = src;
+    img.width = cw;
+    img.height = ch;
+    img.style.cssText = canvas.style.cssText;
+    img.style.width = `${cw}px`;
+    img.style.height = `${ch}px`;
+    img.style.objectFit = "contain";
+    img.style.display = "block";
+    canvas.style.visibility = "hidden";
+    canvas.after(img);
+    hidden.push(canvas);
+    inserted.push(img);
+  }
+  try {
+    return await run();
+  } finally {
+    for (const img of inserted) img.remove();
+    for (const canvas of hidden) canvas.style.visibility = "";
   }
 };
 
-const SKIP_IN_HTML = new Set(["VIDEO", "AUDIO", "CANVAS", "IMG", "SVG"]);
-
-/** HTML/CSS of the board only. Bitmaps are painted separately at CSS size. */
+/** Snapshot the booth program frame as it is on screen. */
 export const rasterizeGraphic = (el: HTMLElement, w: number, h: number): Promise<HTMLCanvasElement> =>
-  toCanvas(el, {
-    width: w,
-    height: h,
-    canvasWidth: w,
-    canvasHeight: h,
-    pixelRatio: 1,
-    cacheBust: false,
-    skipFonts: true,
-    filter: (node) => !SKIP_IN_HTML.has(node.tagName),
-  });
+  withDisplaySizedBitmaps(el, () =>
+    toCanvas(el, {
+      pixelRatio: 1,
+      cacheBust: false,
+      skipFonts: false,
+      skipAutoScale: true,
+      style: { transform: "none" },
+      filter: (node) => {
+        const tag = node.tagName;
+        return tag !== "VIDEO" && tag !== "AUDIO";
+      },
+    }).then((shot) => {
+      if (shot.width === w && shot.height === h) return shot;
+      const fitted = document.createElement("canvas");
+      fitted.width = w;
+      fitted.height = h;
+      const ctx = fitted.getContext("2d");
+      if (!ctx) return shot;
+      ctx.drawImage(shot, 0, 0, w, h);
+      return fitted;
+    }),
+  );
 
-/** Paint the booth picture (camera under graphics) onto a recording canvas. */
+/** Paint the booth picture onto a recording canvas. */
 export const paintBooth = (
   ctx: CanvasRenderingContext2D,
   opts: {
@@ -100,14 +114,17 @@ export const paintBooth = (
     h: number;
     geom: FrameGeom;
     video: HTMLVideoElement | null;
-    graphicRoot: HTMLElement | null;
     graphicSnap: HTMLCanvasElement | null;
     mirror: boolean;
   },
 ) => {
-  const { w, h, geom, video, graphicRoot, graphicSnap, mirror } = opts;
-  ctx.fillStyle = pageFill();
-  ctx.fillRect(0, 0, w, h);
+  const { w, h, geom, video, graphicSnap, mirror } = opts;
+  if (graphicSnap && graphicSnap.width) {
+    ctx.drawImage(graphicSnap, 0, 0, w, h);
+  } else {
+    ctx.fillStyle = pageFill();
+    ctx.fillRect(0, 0, w, h);
+  }
   const cam = geom.cam;
   if (video && cam.w > 0) {
     ctx.save();
@@ -115,10 +132,6 @@ export const paintBooth = (
     drawCover(ctx, video, cam.x, cam.y, cam.w, cam.h, mirror);
     ctx.restore();
   }
-  if (graphicSnap && graphicSnap.width === w && graphicSnap.height === h) {
-    ctx.drawImage(graphicSnap, 0, 0);
-  }
-  if (graphicRoot) drawGraphicLayers(ctx, graphicRoot, w, h);
 };
 
 export const withAudio = (video: MediaStream, voice: MediaStream | null) => {
