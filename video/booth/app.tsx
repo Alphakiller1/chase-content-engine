@@ -17,7 +17,8 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { withAudio } from "./composite";
+import { burnBroadcast, snapshotProgram, withAudio } from "./composite";
+import type { BoardStill } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -218,6 +219,8 @@ const App: React.FC = () => {
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
   const playerBoxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const stillsRef = useRef<BoardStill[]>([]);
+  const boardCache = useRef(new Map<string, Omit<BoardStill, "t">>());
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -241,6 +244,8 @@ const App: React.FC = () => {
   const group = groups[groupIdx];
   const startFrame = instant ? settleFrame(current) : 0;
   const platform = (platformPref || cat?.platform || "reels") as Plat;
+  const layoutRef = useRef({ format, platform, mode, size, mirror });
+  layoutRef.current = { format, platform, mode, size, mirror };
 
   const say = useCallback((text: string) => setFlash({ text, at: performance.now() }), []);
   const now = () => (performance.now() - t0.current) / 1000;
@@ -745,7 +750,13 @@ const App: React.FC = () => {
     say(`Undone · ${cueLabel(last, byKey)}`);
   }, [byKey, currentKey, say]);
 
-  /* recording */
+  /*
+   * Hosted broadcast — keep this split. Do not record the tab or snapshot
+   * every frame: that is what froze the boards.
+   *   LIVE  camera + mic
+   *   CACHE still of each board after it settles on screen
+   *   SAVE  burn those stills onto the camera file after Stop
+   */
   const beginRecording = useCallback(() => {
     if (!stream) return;
     const types = ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp9,opus", "video/webm"];
@@ -777,10 +788,29 @@ const App: React.FC = () => {
         const blob = new Blob(chunks.current, { type: mimeType || "video/webm" });
         lastTake.current = blob;
         if (STATIC) {
-          downloadBlob(`${name}-broadcast.webm`, blob, blob.type);
+          setMessage("Burning boards into the take…");
+          const L = layoutRef.current;
+          const recW = L.format === "wide" ? 1920 : 1080;
+          const recH = L.format === "wide" ? 1080 : 1920;
+          const geom = frameGeom(L.format, L.platform, L.mode, CAM[L.format], L.size);
+          if (!stillsRef.current.length && playerBoxRef.current) {
+            const canvas = await snapshotProgram(playerBoxRef.current, recW, recH);
+            stillsRef.current = [{ t: 0, canvas, geom, mirror: L.mirror }];
+          }
+          const burned = await burnBroadcast({
+            camera: blob,
+            stills: stillsRef.current,
+            w: recW,
+            h: recH,
+            fallbackGeom: geom,
+            mirror: L.mirror,
+            mimeType,
+          });
+          lastTake.current = burned;
+          downloadBlob(`${name}-broadcast.webm`, burned, burned.type);
           setSaved(name);
           setPhase("saved");
-          setMessage("Broadcast take downloaded — graphics, camera, and mic together.");
+          setMessage("Broadcast take downloaded — boards, camera, and mic.");
           return;
         }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
@@ -816,9 +846,12 @@ const App: React.FC = () => {
     if (micId === "phone" && (!phoneTrack || !stream.getAudioTracks().length)) {
       return say("Phone mic is not in the recorder yet — wait until it says Phone mic live");
     }
+    stillsRef.current = [];
+    const opening = boardCache.current.get(`${format}|${mode}|${size}|${currentKey}|${overlaysOn.join(",")}`);
+    if (opening) stillsRef.current.push({ t: 0, ...opening });
     setCount(3);
     setPhase("countdown");
-  }, [micId, phase, phoneTrack, say, stream]);
+  }, [currentKey, format, micId, mode, overlaysOn, phase, phoneTrack, say, size, stream]);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -829,6 +862,36 @@ const App: React.FC = () => {
     const id = setTimeout(() => setCount((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [beginRecording, count, phase]);
+
+  useEffect(() => {
+    if (!STATIC || !currentKey) return;
+    if (phase === "recording" || phase === "saving") return;
+    const el = playerBoxRef.current;
+    if (!el) return;
+    const L = layoutRef.current;
+    const w = L.format === "wide" ? 1920 : 1080;
+    const h = L.format === "wide" ? 1080 : 1920;
+    const id = `${L.format}|${L.mode}|${L.size}|${currentKey}|${overlaysOn.join(",")}`;
+    const timer = window.setTimeout(() => {
+      snapshotProgram(el, w, h).then((canvas) => {
+        boardCache.current.set(id, {
+          canvas,
+          geom: frameGeom(L.format, L.platform, L.mode, CAM[L.format], L.size),
+          mirror: L.mirror,
+        });
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [phase, currentKey, mode, size, format, overlaysOn]);
+
+  useEffect(() => {
+    if (!STATIC || phase !== "recording") return;
+    const L = layoutRef.current;
+    const hit = boardCache.current.get(`${L.format}|${L.mode}|${L.size}|${currentKey}|${overlaysOn.join(",")}`);
+    if (!hit) return;
+    const t = Math.max(0, (performance.now() - t0.current) / 1000);
+    stillsRef.current.push({ t, ...hit });
+  }, [phase, currentKey, mode, size, format, overlaysOn]);
 
   const makeVideo = useCallback(async () => {
     const r = await fetch(`/api/edit?name=${saved}&ext=webm&platform=${platform}`, { method: "POST" });
@@ -1239,7 +1302,7 @@ const App: React.FC = () => {
               <span>
                 {stream
                   ? STATIC
-                    ? "Record saves camera and mic. Boards stay live on screen — they are not re-encoded while you talk."
+                    ? "Record keeps the boards live. Stop burns those boards into the download."
                     : "Record downloads the camera take and live graphic cues."
                   : "Explore every graphic now. Enable your devices when you are ready to record."}
               </span>
