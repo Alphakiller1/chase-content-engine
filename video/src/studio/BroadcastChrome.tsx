@@ -51,6 +51,7 @@ type BroadcastHeaderProps = {
   title: string;
   meta?: string;
   wide: boolean;
+  showLogos?: boolean;
 };
 
 /** One hierarchy for every analysis board: teams frame the editorial question. */
@@ -64,10 +65,11 @@ export const BroadcastHeader: React.FC<BroadcastHeaderProps> = ({
   title,
   meta,
   wide,
+  showLogos = true,
 }) => {
   const side = (team: string, name: string | undefined, reverse = false) => (
     <div style={{ display: "flex", alignItems: "center", flexDirection: reverse ? "row-reverse" : "row", gap: wide ? 12 : 10, minWidth: 0 }}>
-      <TeamLogo team={team} league={league} size={wide ? 58 : 62} />
+      {showLogos ? <TeamLogo team={team} league={league} size={wide ? 58 : 62} /> : null}
       <div style={{ minWidth: 0, textAlign: reverse ? "right" : "left" }}>
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: wide ? 25 : 28, lineHeight: 1, color: teamAccent(team, league) }}>{team}</div>
         {name && wide ? (

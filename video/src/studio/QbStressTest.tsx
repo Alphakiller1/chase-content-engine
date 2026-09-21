@@ -123,9 +123,6 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
               boxShadow: "0 14px 30px rgba(0,0,0,.35)",
             }}
           >
-            <div style={{ position: "absolute", right: -14, bottom: -14, opacity: 0.24 }}>
-              <TeamLogo team={qb.team} league={league} size={portraitSize * 0.78} />
-            </div>
             {qb.headshot ? (
               <Img
                 src={staticFile(qb.headshot)}
@@ -260,6 +257,7 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
             title={title}
             meta="Passing offense vs the coverage and pressure it will actually see"
             wide={wide}
+            showLogos={false}
           />
         </div>
         <div
