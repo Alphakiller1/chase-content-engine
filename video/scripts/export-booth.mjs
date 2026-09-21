@@ -8,6 +8,7 @@
  * data/packs.json and data/packs/<id>/catalog.json — no Python server.
  */
 import { build } from "esbuild";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -66,6 +67,12 @@ await build({
   loader: { ".woff2": "file", ".woff": "file", ".ttf": "file", ".png": "file", ".svg": "file" },
 });
 
+const assetVersion = createHash("sha256")
+  .update(fs.readFileSync(path.join(dist, "app.js")))
+  .update(fs.readFileSync(path.join(dist, "app.css")))
+  .digest("hex")
+  .slice(0, 12);
+
 const html = (title, bodyExtra = "") => `<!doctype html>
 <html lang="en">
   <head>
@@ -75,7 +82,7 @@ const html = (title, bodyExtra = "") => `<!doctype html>
     <base href="${base}" />
     <script>window.remotion_staticBase=${JSON.stringify(baseNoSlash)};</script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22><circle cx=%228%22 cy=%228%22 r=%226%22 fill=%22%23dc2626%22/></svg>" />
-    <link rel="stylesheet" href="dist/app.css" />
+    <link rel="stylesheet" href="dist/app.css?v=${assetVersion}" />
   </head>
   <body>
     ${bodyExtra}
@@ -85,7 +92,7 @@ const html = (title, bodyExtra = "") => `<!doctype html>
 
 fs.writeFileSync(
   path.join(outDir, "index.html"),
-  html("Recording Booth", `<div id="root"></div>\n    <script type="module" src="dist/app.js"></script>`),
+  html("Recording Booth", `<div id="root"></div>\n    <script type="module" src="dist/app.js?v=${assetVersion}"></script>`),
 );
 fs.copyFileSync(path.join(root, "booth", "mic.html"), path.join(outDir, "mic.html"));
 
