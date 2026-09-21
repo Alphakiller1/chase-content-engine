@@ -17,8 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { burnBroadcast, snapshotProgram, withAudio } from "./composite";
-import type { BoardStill } from "./composite";
+import { captureProgram, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -219,8 +218,7 @@ const App: React.FC = () => {
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
   const playerBoxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const stillsRef = useRef<BoardStill[]>([]);
-  const boardCache = useRef(new Map<string, Omit<BoardStill, "t">>());
+  const programCapture = useRef<MediaStream | null>(null);
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -244,8 +242,6 @@ const App: React.FC = () => {
   const group = groups[groupIdx];
   const startFrame = instant ? settleFrame(current) : 0;
   const platform = (platformPref || cat?.platform || "reels") as Plat;
-  const layoutRef = useRef({ format, platform, mode, size, mirror });
-  layoutRef.current = { format, platform, mode, size, mirror };
 
   const say = useCallback((text: string) => setFlash({ text, at: performance.now() }), []);
   const now = () => (performance.now() - t0.current) / 1000;
@@ -751,19 +747,18 @@ const App: React.FC = () => {
   }, [byKey, currentKey, say]);
 
   /*
-   * Hosted broadcast — keep this split. Do not record the tab or snapshot
-   * every frame: that is what froze the boards.
-   *   LIVE  camera + mic
-   *   CACHE still of each board after it settles on screen
-   *   SAVE  burn those stills onto the camera file after Stop
+   * Hosted broadcast records this tab cropped to the program frame.
    */
   const beginRecording = useCallback(() => {
     if (!stream) return;
     const types = ["video/webm;codecs=vp8,opus", "video/webm;codecs=vp9,opus", "video/webm"];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-    const picture = new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
+    const picture =
+      STATIC && programCapture.current
+        ? programCapture.current
+        : new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
     const recStream = withAudio(picture, stream);
-    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 3_000_000, audioBitsPerSecond: 160_000 });
+    const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 4_000_000, audioBitsPerSecond: 160_000 });
     chunks.current = [];
     strokeStore.current = [];
     nextStrokeId.current = 1;
@@ -782,35 +777,18 @@ const App: React.FC = () => {
     };
     rec.onstop = async () => {
       recStream.getTracks().forEach((t) => t.stop());
+      programCapture.current?.getTracks().forEach((t) => t.stop());
+      programCapture.current = null;
       setPhase("saving");
       const name = stamp();
       try {
         const blob = new Blob(chunks.current, { type: mimeType || "video/webm" });
         lastTake.current = blob;
         if (STATIC) {
-          setMessage("Burning boards into the take…");
-          const L = layoutRef.current;
-          const recW = L.format === "wide" ? 1920 : 1080;
-          const recH = L.format === "wide" ? 1080 : 1920;
-          const geom = frameGeom(L.format, L.platform, L.mode, CAM[L.format], L.size);
-          if (!stillsRef.current.length && playerBoxRef.current) {
-            const canvas = await snapshotProgram(playerBoxRef.current, recW, recH);
-            stillsRef.current = [{ t: 0, canvas, geom, mirror: L.mirror }];
-          }
-          const burned = await burnBroadcast({
-            camera: blob,
-            stills: stillsRef.current,
-            w: recW,
-            h: recH,
-            fallbackGeom: geom,
-            mirror: L.mirror,
-            mimeType,
-          });
-          lastTake.current = burned;
-          downloadBlob(`${name}-broadcast.webm`, burned, burned.type);
+          downloadBlob(`${name}-broadcast.webm`, blob, blob.type);
           setSaved(name);
           setPhase("saved");
-          setMessage("Broadcast take downloaded — boards, camera, and mic.");
+          setMessage("Broadcast take downloaded — the program frame plus your mic.");
           return;
         }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
@@ -832,12 +810,14 @@ const App: React.FC = () => {
     rec.start(1000);
   }, [currentKey, mode, overlaysOn, size, stream]);
 
-  const toggleRecord = useCallback(() => {
+  const toggleRecord = useCallback(async () => {
     if (phase === "recording") {
       recRef.current?.stop();
       return;
     }
     if (phase === "countdown") {
+      programCapture.current?.getTracks().forEach((t) => t.stop());
+      programCapture.current = null;
       setPhase("idle");
       say("Countdown cancelled");
       return;
@@ -846,12 +826,26 @@ const App: React.FC = () => {
     if (micId === "phone" && (!phoneTrack || !stream.getAudioTracks().length)) {
       return say("Phone mic is not in the recorder yet — wait until it says Phone mic live");
     }
-    stillsRef.current = [];
-    const opening = boardCache.current.get(`${format}|${mode}|${size}|${currentKey}|${overlaysOn.join(",")}`);
-    if (opening) stillsRef.current.push({ t: 0, ...opening });
+    if (STATIC) {
+      const frame = frameRef.current;
+      if (!frame) return say("Program frame is not ready");
+      try {
+        say("Share this tab — that is the booth picture");
+        const captured = await captureProgram(frame);
+        programCapture.current = captured;
+        captured.getVideoTracks()[0]?.addEventListener("ended", () => recRef.current?.stop());
+      } catch {
+        programCapture.current?.getTracks().forEach((t) => t.stop());
+        programCapture.current = null;
+        say("Tab share cancelled — the take cannot match the boards without it");
+        return;
+      }
+      beginRecording();
+      return;
+    }
     setCount(3);
     setPhase("countdown");
-  }, [currentKey, format, micId, mode, overlaysOn, phase, phoneTrack, say, size, stream]);
+  }, [beginRecording, micId, phase, phoneTrack, say, stream]);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -862,36 +856,6 @@ const App: React.FC = () => {
     const id = setTimeout(() => setCount((c) => c - 1), 1000);
     return () => clearTimeout(id);
   }, [beginRecording, count, phase]);
-
-  useEffect(() => {
-    if (!STATIC || !currentKey) return;
-    if (phase === "recording" || phase === "saving") return;
-    const el = playerBoxRef.current;
-    if (!el) return;
-    const L = layoutRef.current;
-    const w = L.format === "wide" ? 1920 : 1080;
-    const h = L.format === "wide" ? 1080 : 1920;
-    const id = `${L.format}|${L.mode}|${L.size}|${currentKey}|${overlaysOn.join(",")}`;
-    const timer = window.setTimeout(() => {
-      snapshotProgram(el, w, h).then((canvas) => {
-        boardCache.current.set(id, {
-          canvas,
-          geom: frameGeom(L.format, L.platform, L.mode, CAM[L.format], L.size),
-          mirror: L.mirror,
-        });
-      });
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [phase, currentKey, mode, size, format, overlaysOn]);
-
-  useEffect(() => {
-    if (!STATIC || phase !== "recording") return;
-    const L = layoutRef.current;
-    const hit = boardCache.current.get(`${L.format}|${L.mode}|${L.size}|${currentKey}|${overlaysOn.join(",")}`);
-    if (!hit) return;
-    const t = Math.max(0, (performance.now() - t0.current) / 1000);
-    stillsRef.current.push({ t, ...hit });
-  }, [phase, currentKey, mode, size, format, overlaysOn]);
 
   const makeVideo = useCallback(async () => {
     const r = await fetch(`/api/edit?name=${saved}&ext=webm&platform=${platform}`, { method: "POST" });
@@ -1302,7 +1266,7 @@ const App: React.FC = () => {
               <span>
                 {stream
                   ? STATIC
-                    ? "Record keeps the boards live. Stop burns those boards into the download."
+                    ? "Record asks to share this tab. Pick this tab. The file is the program frame plus your mic."
                     : "Record downloads the camera take and live graphic cues."
                   : "Explore every graphic now. Enable your devices when you are ready to record."}
               </span>
