@@ -758,7 +758,7 @@ const App: React.FC = () => {
         h: recH,
         geom,
         video: videoRef.current,
-        graphic: playerCanvas(playerBoxRef.current),
+        graphic: playerCanvas(playerRef.current?.getContainerNode?.() ?? playerBoxRef.current, recW, recH),
         mirror,
       });
       raf = requestAnimationFrame(paint);

@@ -44,9 +44,29 @@ const drawCover = (
   ctx.restore();
 };
 
-export const playerCanvas = (root: HTMLElement | null | undefined): HTMLCanvasElement | null => {
+/** The Remotion program canvas, never a nested team-logo CanvasImage. */
+export const playerCanvas = (
+  root: HTMLElement | null | undefined,
+  w?: number,
+  h?: number,
+): HTMLCanvasElement | null => {
   if (!root) return null;
-  return root.querySelector("canvas");
+  const canvases = [...root.querySelectorAll("canvas")];
+  if (!canvases.length) return null;
+  const depth = (el: HTMLElement) => {
+    let d = 0;
+    for (let n = el.parentElement; n && n !== root; n = n.parentElement) d += 1;
+    return d;
+  };
+  const score = (c: HTMLCanvasElement) => {
+    const exact = w && h && c.width === w && c.height === h ? 0 : 1;
+    const aspect =
+      w && h && c.height
+        ? Math.abs(c.width / c.height - w / h)
+        : 99;
+    return exact * 1_000_000 + aspect * 10_000 + depth(c) * 100 - Math.min(c.width * c.height, 9_000_000) / 1_000_000;
+  };
+  return [...canvases].sort((a, b) => score(a) - score(b))[0] ?? null;
 };
 
 /** Paint the booth picture (camera under graphics) onto a recording canvas. */
