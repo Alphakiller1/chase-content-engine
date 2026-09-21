@@ -17,7 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { paintBooth, rasterizeGraphic, withAudio } from "./composite";
+import { captureProgram, cropProgram, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -219,6 +219,7 @@ const App: React.FC = () => {
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
   const playerBoxRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
+  const programCapture = useRef<MediaStream | null>(null);
   const lastTake = useRef<Blob | null>(null);
   const meterRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -739,6 +740,11 @@ const App: React.FC = () => {
     say(`Undone · ${cueLabel(last, byKey)}`);
   }, [byKey, currentKey, say]);
 
+  const stopProgramCapture = () => {
+    programCapture.current?.getTracks().forEach((t) => t.stop());
+    programCapture.current = null;
+  };
+
   /* recording */
   const beginRecording = useCallback(() => {
     if (!stream) return;
@@ -746,41 +752,38 @@ const App: React.FC = () => {
     const recH = format === "wide" ? 1080 : 1920;
     const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
     const mimeType = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
-    const canvas = document.createElement("canvas");
-    canvas.width = recW;
-    canvas.height = recH;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    let raf = 0;
-    let snapBusy = false;
-    let graphicSnap: HTMLCanvasElement | null = null;
-    const paint = () => {
+    const chunksStop: Array<() => void> = [];
+    let picture: MediaStream;
+    if (STATIC) {
+      const captured = programCapture.current;
       const frame = frameRef.current;
-      if (STATIC && frame && !snapBusy) {
-        snapBusy = true;
-        rasterizeGraphic(frame, recW, recH)
-          .then((shot) => {
-            graphicSnap = shot;
-          })
-          .catch(() => {
-            graphicSnap = null;
-          })
-          .finally(() => {
-            snapBusy = false;
-          });
+      if (!captured || !frame) {
+        setPhase("error");
+        setMessage("Share this Chrome tab when asked — the take is the booth picture, not a copy of it.");
+        return;
       }
-      paintBooth(ctx, {
-        w: recW,
-        h: recH,
-        geom: frameGeom(format, platform, mode, CAM[format], size),
-        video: videoRef.current,
-        graphicSnap,
-        mirror,
-      });
-      raf = requestAnimationFrame(paint);
-    };
-    paint();
-    const picture = STATIC ? canvas.captureStream(30) : new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
+      void cropProgram(captured, frame);
+      const view = document.createElement("video");
+      view.srcObject = captured;
+      view.muted = true;
+      view.playsInline = true;
+      void view.play();
+      const canvas = document.createElement("canvas");
+      canvas.width = recW;
+      canvas.height = recH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      let raf = 0;
+      const paint = () => {
+        if (view.readyState >= 2) ctx.drawImage(view, 0, 0, recW, recH);
+        raf = requestAnimationFrame(paint);
+      };
+      paint();
+      chunksStop.push(() => cancelAnimationFrame(raf));
+      picture = canvas.captureStream(30);
+    } else {
+      picture = new MediaStream(stream.getVideoTracks().map((t) => t.clone()));
+    }
     const recStream = withAudio(picture, stream);
     const rec = new MediaRecorder(recStream, { mimeType, videoBitsPerSecond: 6_000_000, audioBitsPerSecond: 192_000 });
     chunks.current = [];
@@ -802,8 +805,9 @@ const App: React.FC = () => {
       setNonce((n) => n + 1);
     };
     rec.onstop = async () => {
-      cancelAnimationFrame(raf);
+      chunksStop.forEach((fn) => fn());
       recStream.getTracks().forEach((t) => t.stop());
+      stopProgramCapture();
       setPhase("saving");
       const name = stamp();
       try {
@@ -813,7 +817,7 @@ const App: React.FC = () => {
           downloadBlob(`${name}-broadcast.webm`, blob, blob.type);
           setSaved(name);
           setPhase("saved");
-          setMessage("Broadcast take downloaded — graphics, camera, and mic together.");
+          setMessage("Broadcast take downloaded — this is the booth frame plus your mic.");
           return;
         }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
@@ -833,14 +837,15 @@ const App: React.FC = () => {
     };
     recRef.current = rec;
     rec.start(1000);
-  }, [currentKey, format, mirror, mode, overlaysOn, platform, size, stream]);
+  }, [currentKey, format, mode, overlaysOn, size, stream]);
 
-  const toggleRecord = useCallback(() => {
+  const toggleRecord = useCallback(async () => {
     if (phase === "recording") {
       recRef.current?.stop();
       return;
     }
     if (phase === "countdown") {
+      stopProgramCapture();
       setPhase("idle");
       say("Countdown cancelled");
       return;
@@ -848,6 +853,20 @@ const App: React.FC = () => {
     if (phase === "saving" || !stream) return;
     if (micId === "phone" && (!phoneTrack || !stream.getAudioTracks().length)) {
       return say("Phone mic is not in the recorder yet — wait until it says Phone mic live");
+    }
+    if (STATIC) {
+      const frame = frameRef.current;
+      if (!frame) return say("Program frame is not ready");
+      try {
+        say("Share this tab so the take is the booth, not a copy");
+        const captured = await captureProgram(frame);
+        programCapture.current = captured;
+        captured.getVideoTracks()[0]?.addEventListener("ended", () => recRef.current?.stop());
+      } catch {
+        stopProgramCapture();
+        say("Tab share was cancelled — Chrome has to capture this tab for the take to match");
+        return;
+      }
     }
     setCount(3);
     setPhase("countdown");
@@ -1090,8 +1109,8 @@ const App: React.FC = () => {
             Click here so the booth can hear your keys
           </div>
         ) : null}
-        <div className="frame" style={{ width: W * scale, height: H * scale }}>
-          <div ref={frameRef} style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
+        <div ref={frameRef} className="frame" style={{ width: W * scale, height: H * scale }}>
+          <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
             {/* 1. page ground  2. live camera  3. the frame (transparent)  4. ink */}
             <div style={{ position: "absolute", inset: 0, background: "var(--surface-page)" }} />
             <div
@@ -1271,7 +1290,9 @@ const App: React.FC = () => {
               <b>{stream ? "Camera and microphone ready" : mediaRequested && !camError ? "Connecting camera and microphone…" : "Studio preview ready"}</b>
               <span>
                 {stream
-                  ? "Record downloads the camera take and live graphic cues."
+                  ? STATIC
+                    ? "Record asks Chrome to share this tab, then saves the booth you see plus your mic."
+                    : "Record downloads the camera take and live graphic cues."
                   : "Explore every graphic now. Enable your devices when you are ready to record."}
               </span>
             </div>

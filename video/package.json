@@ -9,7 +9,6 @@
     "@remotion/cli": "4.0.520",
     "@remotion/google-fonts": "4.0.520",
     "@remotion/tailwind-v4": "4.0.520",
-    "html-to-image": "^1.11.13",
     "peerjs": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
