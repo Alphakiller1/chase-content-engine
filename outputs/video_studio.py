@@ -557,12 +557,10 @@ def cover_heat_items(a, g: dict) -> list[tuple[str, str, dict]]:
 
 def qb_stress_item(a, g: dict, qa: dict | None, qh: dict | None) -> tuple[str, str, dict] | None:
     """Two-QB story board: passing EPA vs the opponent's actual coverage and pressure menu."""
-    if not qa or not qh:
-        return None
     away, home = g["away"].upper(), g["home"].upper()
     collisions = []
 
-    def side(off_side: str, def_side: str, qb: dict) -> dict:
+    def side(off_side: str, def_side: str, qb: dict | None) -> dict:
         off_s = g.get(f"{off_side}_scheme") or {}
         def_s = g.get(f"{def_side}_scheme") or {}
         off_r = _scheme_unit(off_s, "offense", "response")
@@ -573,7 +571,8 @@ def qb_stress_item(a, g: dict, qa: dict | None, qh: dict | None) -> tuple[str, s
         def_p = _scheme_unit(def_s, "defense", "pressure")
         off_team = g[off_side].upper()
         def_team = g[def_side].upper()
-        qb_name = qb.get("player_name") or "Quarterback"
+        face = _qb_face(g, off_team, qb)
+        qb_name = face["name"]
         specs = (
             ("Man coverage", "man", def_c.get("man_rate"), "coverage", "man_rate"),
             ("Zone coverage", "zone", def_c.get("zone_rate"), "coverage", "zone_rate"),
@@ -608,9 +607,9 @@ def qb_stress_item(a, g: dict, qa: dict | None, qh: dict | None) -> tuple[str, s
                     "def_rank": int(defense["rank"]),
                     "defense": def_team,
                 })
-        yards = (qb.get("metrics") or {}).get("passing_yards")
+        yards = ((qb or {}).get("metrics") or {}).get("passing_yards")
         return {
-            "quarterback": _qb_face(g, off_team, qb),
+            "quarterback": face,
             "defense": def_team,
             "defenseName": g.get(f"{def_side}_name", def_team),
             "projection": f"Model · {float(yards):.0f} pass yds" if yards is not None else "",
@@ -632,7 +631,7 @@ def qb_stress_item(a, g: dict, qa: dict | None, qh: dict | None) -> tuple[str, s
         )
     else:
         note = "Read frequency first, then performance: a defense's favorite call is not always its best call."
-    note += " EPA is the team passing split with the projected starter shown."
+    note += " EPA is the team passing split; the published starter is shown."
 
     return ("qb-stress", "QbStressTest", {
         "league": "nfl", "away": away, "home": home,
