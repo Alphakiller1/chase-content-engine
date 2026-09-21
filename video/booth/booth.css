@@ -26,6 +26,8 @@ body,
   justify-content: center;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+  container-type: size;
   background:
     radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
     linear-gradient(var(--border-card) 1px, transparent 1px),
@@ -72,7 +74,18 @@ body,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.program-fit {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
 .frame {
+  --ar: var(--program-ar, 1.777);
+  width: min(100cqi, calc(100cqb * var(--ar)));
+  height: min(100cqb, calc(100cqi / var(--ar)));
   position: relative;
   overflow: hidden;
   border-radius: 14px;

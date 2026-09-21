@@ -109,22 +109,22 @@ const settleFrame = (e: Entry | null) =>
   !e ? 0 : e.composition === "Annotate" ? 0 : e.composition.startsWith("RankCountdown") ? 7 * FPS : SETTLED;
 const teamOf = (e: Entry | undefined) => String((e?.props as { team?: string } | undefined)?.team ?? "");
 
-/** Scale that fits a w x h frame in an element; attaches whenever the element mounts. */
-function useFit(w: number, h: number) {
+/** Measure an element; used to scale the 1920×1080 program into the stage. */
+function useBox() {
   const [el, setEl] = useState<HTMLElement | null>(null);
-  const [scale, setScale] = useState(0.3);
+  const [box, setBox] = useState({ w: 0, h: 0 });
   useEffect(() => {
     if (!el) return;
-    const fit = () => {
+    const read = () => {
       const r = el.getBoundingClientRect();
-      setScale(Math.max(0.1, Math.min((r.width - 24) / w, (r.height - 24) / h)));
+      setBox({ w: r.width, h: r.height });
     };
-    fit();
-    const ro = new ResizeObserver(fit);
+    read();
+    const ro = new ResizeObserver(read);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [el, w, h]);
-  return [setEl, scale] as const;
+  }, [el]);
+  return [setEl, box] as const;
 }
 
 const strokePath = (s: Stroke, W: number, H: number) =>
@@ -875,7 +875,12 @@ const App: React.FC = () => {
   /* drawing */
   const W = format === "wide" ? 1920 : 1080;
   const H = format === "wide" ? 1080 : 1920;
-  const [stageEl, scale] = useFit(W, H);
+  const [setFrameEl, frameBox] = useBox();
+  const scale = frameBox.w > 8 ? frameBox.w / W : 0.3;
+  const bindFrame = (node: HTMLDivElement | null) => {
+    frameRef.current = node;
+    setFrameEl(node);
+  };
   const drawActive = pen;
   const press = useRef<{ x: number; y: number; id: number } | null>(null);
   const toFrame = (e: React.PointerEvent) => {
@@ -1082,7 +1087,7 @@ const App: React.FC = () => {
 
   return (
     <div className="booth">
-      <main ref={stageEl} className="stage">
+      <main className="stage" style={{ ["--program-ar" as string]: String(W / H) }}>
         <div className="program-rail" aria-hidden="true">
           <span className={recording ? "program-tag live" : "program-tag"}>{recording ? "● ON AIR" : "PROGRAM"}</span>
           <b>{format === "vertical" ? "VERTICAL 9:16" : "WIDE 16:9"}</b>
@@ -1094,7 +1099,8 @@ const App: React.FC = () => {
             Click here so the booth can hear your keys
           </div>
         ) : null}
-        <div ref={frameRef} className="frame" style={{ width: W * scale, height: H * scale }}>
+        <div className="program-fit">
+        <div ref={bindFrame} className="frame">
           <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
             {/* 1. page ground  2. live camera  3. the frame (transparent)  4. ink */}
             <div style={{ position: "absolute", inset: 0, background: "var(--surface-page)" }} />
@@ -1198,6 +1204,7 @@ const App: React.FC = () => {
           {recording ? <div className="rec-badge">● REC <span data-rec-clock>0:00</span></div> : null}
           {flash.text ? <div className="flash">{flash.text}</div> : null}
           {phase === "countdown" ? <div className="countdown">{count || ""}</div> : null}
+        </div>
         </div>
       </main>
 
