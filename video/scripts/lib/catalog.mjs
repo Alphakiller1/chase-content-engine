@@ -148,11 +148,12 @@ export function loadPack(packDir) {
       item("cover-home")?.props.note || "");
     add("scheme", "Scheme", "scheme-pressure", "Pressure", "stats-pressure", boardNote("stats-pressure"));
     add("scheme", "Scheme", "scheme-targets", "Targets", "stats-targets", boardNote("stats-targets"));
-    const ranks = item("ranks");
-    if (ranks) {
-      const spot = (ranks.props.items ?? []).filter((x) => x.spotlight).map((x) => `#${x.rank} ${x.label}`).join("  ·  ");
-      add("ranks", "Power ratings", "ranks", "Power ratings", "ranks", spot);
-    }
+    add("ranks", "Power ratings", "ranks", "1–16", "ranks",
+      (item("ranks")?.props.items ?? []).filter((x) => x.spotlight).map((x) => `#${x.rank} ${x.label}`).join("  ·  ") || "Top half of the board");
+    add("ranks", "Power ratings", "ranks-17-32", "17–32", "ranks-17-32",
+      (item("ranks-17-32")?.props.items ?? []).filter((x) => x.spotlight).map((x) => `#${x.rank} ${x.label}`).join("  ·  ") || "Bottom half of the board");
+    add("ranks", "Power ratings", "ranks-duel", "These two", "ranks-duel",
+      (item("ranks-duel")?.props.items ?? []).map((x) => `#${x.rank} ${x.value}`).join("  ·  "));
 
     // ── PLAYERS ──
     add("qb", "Skill duels", "qb", "QBs", "qb-matchup",

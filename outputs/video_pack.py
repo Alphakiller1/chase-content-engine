@@ -241,8 +241,10 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
 
     qbs = {}
     for p in board.get("player_projections", []):
-        if (p.get("position") == "QB" and p.get("depth_rank") == 1
-                and {p.get("team"), p.get("opponent")} == {away, home}):
+        if p.get("position") != "QB" or p.get("depth_rank") != 1:
+            continue
+        t, o = p.get("team") or "", p.get("opponent") or ""
+        if (t in club_keys(away) and o in club_keys(home)) or (t in club_keys(home) and o in club_keys(away)):
             qbs[p["team"]] = p
     qa, qh = club_get(qbs, away), club_get(qbs, home)
     fa, fh = ta.get("form", {}), th.get("form", {})
@@ -324,17 +326,32 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
             items.append((name + "-wide", "LineGapWide", {**props, "platform": "youtube"}))
 
     ranked = sorted(board.get("teams", []), key=lambda t: t["rank"])
-    top = max((t["rating"] for t in ranked), default=1) or 1
-    cut_to = max(8, ta.get("rank", 0), th.get("rank", 0))
-    rows = [{"rank": t["rank"], "label": t["name"], "sub": t.get("division", ""),
-             "value": f"{t['rating']:.2f}", "team": t["team"], "league": "nfl",
-             "share": max(0.0, t["rating"] / top),
-             **({"spotlight": True} if t["team"] in (away, home) else {})}
-            for t in ranked if t["rank"] <= cut_to][:10]
+    spot = club_keys(away) | club_keys(home)
+    lo = min((t["rating"] for t in ranked), default=0)
+    span = max((t["rating"] - lo for t in ranked), default=1) or 1
+
+    def rank_row(t):
+        return {"rank": t["rank"], "label": t["name"], "sub": t.get("division", ""),
+                "value": f"{t['rating']:+.2f}", "team": t["team"], "league": "nfl",
+                "share": max(0.08, (t["rating"] - lo) / span),
+                **({"spotlight": True} if t["team"] in spot else {})}
+
     items.append(("ranks", "RankCountdown", {
         "platform": P, "eyebrow": f"NFL Power Ratings · {week}",
-        "title": "Where These Clubs Rank", "valueLabel": "Rating", "items": rows,
-        "note": "Opponent-adjusted rating from nfl-model (research only). These two clubs highlighted."}))
+        "title": "1 through 16", "valueLabel": "Rating",
+        "items": [rank_row(t) for t in ranked if t["rank"] <= 16],
+        "note": "nfl-model opponent-adjusted rating (research only). Tonight's clubs are lit when they sit in this half."}))
+    items.append(("ranks-17-32", "RankCountdown", {
+        "platform": P, "eyebrow": f"NFL Power Ratings · {week}",
+        "title": "17 through 32", "valueLabel": "Rating",
+        "items": [rank_row(t) for t in ranked if t["rank"] >= 17],
+        "note": "Same 32-team pool. Tonight's club is highlighted here when it ranks 17th or worse."}))
+    pair = [rank_row(t) for t in ranked if t["team"] in spot]
+    if pair:
+        items.append(("ranks-duel", "RankCountdown", {
+            "platform": P, "eyebrow": f"NFL Power Ratings · {week}",
+            "title": "These Two Clubs", "valueLabel": "Rating", "items": pair,
+            "note": "Exact power rank and rating for the two clubs on this card."}))
 
     open_props = {**base, "show": show,
                   "title": a.title or f"{g.get('away_name', away)} at {g.get('home_name', home)}",
@@ -414,7 +431,7 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
     items += clash_items(a, g, qa, qh)
     items += cover_heat_items(a, g)
     items += injury_items(a, g)
-    items += player_items(a, g, qbs, props_by_player) + metric_items(a, g)
+    items += player_items(a, g, qbs, props_by_player, board.get("player_projections")) + metric_items(a, g)
     try:
         items += last_game_items(a, g)
     except Exception as exc:  # a missing box score should not stop the pack

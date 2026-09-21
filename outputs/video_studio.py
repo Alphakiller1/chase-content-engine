@@ -30,7 +30,7 @@ FACE_INDEX = PIPELINE / "video" / "props" / ".cache" / "sleeper_faces.json"
 
 OFFENSE_POS = {"QB", "RB", "FB", "WR", "TE", "OT", "OL", "G", "C", "T", "LT", "LG", "RG", "RT"}
 
-NFL_TEAM_ALIAS = {"WSH": "WAS", "WAS": "WSH"}
+NFL_TEAM_ALIAS = {"WSH": "WAS", "WAS": "WSH", "LAR": "LA", "LA": "LAR"}
 
 
 def club_keys(code: str) -> set[str]:
@@ -938,9 +938,33 @@ def injury_items(a, g: dict) -> list[tuple[str, str, dict]]:
 SKILL_POS = {"RB", "FB", "WR", "TE"}
 
 
-def player_items(a, g: dict, qbs: dict, props_by_player: dict | None = None) -> list[tuple[str, str, dict]]:
-    """Cards for skill starters. QBs are the QB-duel slide; linemen and injured
-    defenders are the injury report, not a third copy of the same name."""
+def _projection_tiles(pj: dict | None, pos: str) -> list[dict]:
+    m = (pj or {}).get("metrics") or {}
+    if not m:
+        return []
+    if pos == "RB":
+        spec = (("rushing_yards", "Model rush yds"), ("carries", "Model carries"),
+                ("receiving_yards", "Model rec yds"), ("receptions", "Model rec"))
+    elif pos in {"WR", "TE"}:
+        spec = (("receiving_yards", "Model rec yds"), ("receptions", "Model rec"),
+                ("targets", "Model targets"), ("rushing_yards", "Model rush yds"))
+    else:
+        spec = (("passing_yards", "Model pass yds"), ("passing_tds", "Model pass TDs"),
+                ("rushing_yards", "Model rush yds"))
+    out = []
+    for key, label in spec:
+        if m.get(key) is None:
+            continue
+        out.append({"label": label, "value": f"{float(m[key]):.1f}"})
+    return out[:4]
+
+
+def player_items(a, g: dict, qbs: dict, props_by_player: dict | None = None,
+                 projections: list | None = None) -> list[tuple[str, str, dict]]:
+    """Skill-starter cards: nfl-model this-game projections, plus DraftKings when live."""
+    clubs = club_keys(g["away"]) | club_keys(g["home"])
+    by_name = {_key(p.get("player_name", "")): p for p in projections or []
+               if p.get("team") in clubs}
     items = []
     for side in ("away", "home"):
         team = g[side].upper()
@@ -958,20 +982,16 @@ def player_items(a, g: dict, qbs: dict, props_by_player: dict | None = None) -> 
             people[_key(p["name"])] = {**p, "role": f"{p['position']}{p.get('depth_rank', '')}"}
         for k, p in people.items():
             st = status.get(k)
-            stats = []
-            try:
-                from outputs.season_starts import starter_lines
-                stats = starter_lines(p["name"], team, p["position"])
-            except Exception:
-                stats = []
+            dk = (props_by_player or {}).get(k, [])[:4]
+            tiles = _projection_tiles(by_name.get(k), p["position"])
             items.append((f"player-{slug(p['name'])}", "PlayerCard", {
                 "league": "nfl", "team": team, "teamName": g.get(f"{side}_name", team),
                 "name": p["name"], "position": p["position"], "role": p.get("role", ""),
                 "headshot": headshot(p.get("headshot_url")),
                 "status": st["status"] if st else "Active", "detail": (st or {}).get("detail", ""),
-                "stats": stats,
-                "statsLabel": "This season's starts" if stats else "",
-                "props": (props_by_player or {}).get(k, [])[:4],
+                "stats": [] if dk else tiles,
+                "statsLabel": "" if dk else ("nfl-model this game · research only" if tiles else ""),
+                "props": dk,
                 "eyebrow": f"{a.tag} · {team} {p['position']}",
             }))
     return items
