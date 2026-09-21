@@ -37,7 +37,8 @@ import { MixTable, MixTableProps } from "./studio/MixTable";
 import { InjuryBoard, InjuryBoardProps } from "./studio/InjuryBoard";
 import { ClashBoard, ClashBoardProps } from "./studio/ClashBoard";
 import { CoverHeat, CoverHeatProps } from "./studio/CoverHeat";
-import { SAMPLE_CLASH, SAMPLE_COVER, SAMPLE_FORMATION, SAMPLE_INJURY, SAMPLE_LAST_GAME, SAMPLE_LINE_MOVE, SAMPLE_METRICS, SAMPLE_MIX, SAMPLE_PLAYER, SAMPLE_PROPS, SAMPLE_QB, SAMPLE_SCHEME, SAMPLE_TEAMS } from "./fixtures/studio";
+import { QbStressTest, QbStressTestProps } from "./studio/QbStressTest";
+import { SAMPLE_CLASH, SAMPLE_COVER, SAMPLE_FORMATION, SAMPLE_INJURY, SAMPLE_LAST_GAME, SAMPLE_LINE_MOVE, SAMPLE_METRICS, SAMPLE_MIX, SAMPLE_PLAYER, SAMPLE_PROPS, SAMPLE_QB, SAMPLE_QB_STRESS, SAMPLE_SCHEME, SAMPLE_TEAMS } from "./fixtures/studio";
 
 /** 9:16 master for Reels/Shorts/TikTok. WIDE is 16:9 long-form. */
 const VERTICAL = { width: 1080, height: 1920, fps: 30 };
@@ -426,6 +427,10 @@ export const RemotionRoot: React.FC = () => {
           defaultProps={SAMPLE_COVER} calculateMetadata={opaqueExport<CoverHeatProps>()} />
         <Composition id="CoverHeatWide" component={CoverHeat} durationInFrames={8 * WIDE.fps} {...WIDE}
           defaultProps={SAMPLE_COVER} calculateMetadata={opaqueExport<CoverHeatProps>()} />
+        <Composition id="QbStressTest" component={QbStressTest} durationInFrames={8 * VERTICAL.fps} {...VERTICAL}
+          defaultProps={SAMPLE_QB_STRESS} calculateMetadata={opaqueExport<QbStressTestProps>()} />
+        <Composition id="QbStressTestWide" component={QbStressTest} durationInFrames={8 * WIDE.fps} {...WIDE}
+          defaultProps={SAMPLE_QB_STRESS} calculateMetadata={opaqueExport<QbStressTestProps>()} />
       </Folder>
 
       <Folder name="Edit">

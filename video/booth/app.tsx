@@ -53,6 +53,7 @@ type LiveStroke = Stroke & { live?: boolean };
 const GROUP_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
 const LAYOUT_KEYS: Record<string, LayoutMode> = { a: "bubble", s: "split", d: "full", f: "host" };
 const LAYOUT_LABEL: Record<LayoutMode, string> = { bubble: "Bubble", split: "Split", full: "Graphic only", host: "Camera only" };
+const DEFAULT_LAYOUT: LayoutMode = STATIC ? "full" : "bubble";
 const TONES: Tone[] = ["accent", "caution", "negative", "positive", "primary"];
 const TONE_CSS: Record<Tone, string> = {
   accent: "var(--accent)",
@@ -166,7 +167,7 @@ const App: React.FC = () => {
   const [packs, setPacks] = useState<PackOpt[]>([]);
   const [loadError, setLoadError] = useState("");
   const [format, setFormat] = useState<"vertical" | "wide">(() => (readPref("booth.format", "vertical") === "wide" ? "wide" : "vertical"));
-  const [mode, setMode] = useState<LayoutMode>("bubble");
+  const [mode, setMode] = useState<LayoutMode>(DEFAULT_LAYOUT);
   const [currentKey, setCurrentKey] = useState("matchup");
   const [variantOf, setVariantOf] = useState<Record<string, string>>({});
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -175,6 +176,8 @@ const App: React.FC = () => {
   const [instant, setInstant] = useState(() => readPref("booth.instant3", "1") === "1");
 
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [mediaRequested, setMediaRequested] = useState(!STATIC);
+  const [mediaAttempt, setMediaAttempt] = useState(0);
   const [camError, setCamError] = useState("");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [camId, setCamId] = useState(() => readPref("booth.cam", ""));
@@ -393,6 +396,7 @@ const App: React.FC = () => {
 
   /* desktop camera always; desktop mic unless the phone is the mic */
   useEffect(() => {
+    if (!mediaRequested) return;
     let alive = true;
     let local: MediaStream | null = null;
     const desktopMic = micId !== "phone";
@@ -408,15 +412,16 @@ const App: React.FC = () => {
         local = s;
         setCamStream(s);
         setCamError("");
+        if (STATIC) setMode((currentMode) => (currentMode === "full" ? "bubble" : currentMode));
         setDevices(await navigator.mediaDevices.enumerateDevices());
       })
-      .catch((e) => setCamError(`Camera/microphone blocked or missing: ${e.message}. Allow access in the address bar, then reload.`));
+      .catch((e) => setCamError(`Camera or microphone is not available: ${e.message}. Check the browser permission icon, then try again.`));
     return () => {
       alive = false;
       local?.getTracks().forEach((t) => t.stop());
       setCamStream(null);
     };
-  }, [camId, micId]);
+  }, [camId, mediaAttempt, mediaRequested, micId]);
 
   useEffect(() => {
     if (!phoneTrack) return;
@@ -469,20 +474,21 @@ const App: React.FC = () => {
       return;
     }
     setPhoneState("wait");
-    let peer: { destroy: () => void } | null = null;
-    let callRef: { close: () => void } | null = null;
+    let peer: import("peerjs").default | null = null;
+    let callRef: import("peerjs").MediaConnection | null = null;
     let cancelled = false;
     import("peerjs").then(({ default: Peer }) => {
       if (cancelled) return;
-      peer = new Peer(peerIdFor(room), {
+      const createdPeer = new Peer(peerIdFor(room), {
         config: { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] },
       });
-      peer.on("open", () => say("Phone link ready — scan or open it on your phone"));
-      peer.on("error", (err) => {
+      peer = createdPeer;
+      createdPeer.on("open", () => say("Phone link ready — scan or open it on your phone"));
+      createdPeer.on("error", (err) => {
         if (err.type === "unavailable-id") say("Audio room busy — reload the booth and try again");
         else say("Phone link error: " + err.type);
       });
-      peer.on("call", (call) => {
+      createdPeer.on("call", (call) => {
         call.answer();
         callRef = call;
         call.on("stream", (remote) => {
@@ -693,6 +699,13 @@ const App: React.FC = () => {
     say(`Marked #${n}`);
   }, [pushCue, say]);
 
+  const requestMedia = useCallback(() => {
+    setCamError("");
+    setMediaRequested(true);
+    setMediaAttempt((attempt) => attempt + 1);
+    say("Requesting camera and microphone");
+  }, [say]);
+
   const undo = useCallback(() => {
     if (recRef.current?.state !== "recording") {
       setStrokes((s) => s.slice(0, -1));
@@ -709,7 +722,7 @@ const App: React.FC = () => {
       }
     } else if (last.cmd === "layout") {
       const prev = [...cuesRef.current].reverse().find((c) => c.cmd === "layout");
-      setMode((prev?.arg as LayoutMode) ?? "bubble");
+      setMode((prev?.arg as LayoutMode) ?? DEFAULT_LAYOUT);
     } else if (last.cmd === "size") {
       const prev = [...cuesRef.current].reverse().find((c) => c.cmd === "size");
       setSize(((prev?.arg as StageSize) ?? "full") as StageSize);
@@ -804,7 +817,7 @@ const App: React.FC = () => {
     };
     recRef.current = rec;
     rec.start(1000);
-  }, [STATIC, currentKey, format, mirror, mode, overlaysOn, platform, size, stream]);
+  }, [currentKey, format, mirror, mode, overlaysOn, platform, size, stream]);
 
   const toggleRecord = useCallback(() => {
     if (phase === "recording") {
@@ -1040,12 +1053,22 @@ const App: React.FC = () => {
   const cams = devices.filter((d) => d.kind === "videoinput");
   const mics = devices.filter((d) => d.kind === "audioinput");
   const nextGroup = groups[(groupIdx + 1) % groups.length];
+  const storySteps = ["matchup", "market", "form", "qb", "injuries", "scheme"]
+    .map((key) => ({ key, index: groups.findIndex((g) => g.group === key) }))
+    .filter((step) => step.index >= 0)
+    .map((step) => ({ ...step, group: groups[step.index] }));
   const teams = [cat.game.away, cat.game.home];
   const ringPad = G.cam.ring ? 5 : 0;
 
   return (
     <div className="booth">
       <main ref={stageEl} className="stage">
+        <div className="program-rail" aria-hidden="true">
+          <span className={recording ? "program-tag live" : "program-tag"}>{recording ? "● ON AIR" : "PROGRAM"}</span>
+          <b>{format === "vertical" ? "VERTICAL 9:16" : "WIDE 16:9"}</b>
+          <span>{LAYOUT_LABEL[mode]}</span>
+          <span className="program-now">{currentVertical?.groupLabel} · {currentVertical?.label}</span>
+        </div>
         {!focused ? (
           <div className="focus-banner" onClick={() => window.focus()}>
             Click here so the booth can hear your keys
@@ -1076,7 +1099,8 @@ const App: React.FC = () => {
                 playsInline
                 style={{ borderRadius: Math.max(0, G.cam.r - ringPad), transform: mirror ? "scaleX(-1)" : undefined }}
               />
-              {/* Keep WebRTC phone audio actually playing so MediaRecorder gets samples. */}
+              {/* Keep WebRTC phone audio playing so MediaRecorder gets samples. This is a live MediaStream, not timeline media. */}
+              {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
               <audio ref={phoneAudioRef} autoPlay playsInline style={{ display: "none" }} />
             </div>
             <div ref={playerBoxRef} style={{ position: "absolute", inset: 0, width: W, height: H }}>
@@ -1225,7 +1249,22 @@ const App: React.FC = () => {
         </header>
 
         <section>
-          {phase === "saving" ? (
+          <div className={`media-status ${stream ? "ready" : mediaRequested && !camError ? "connecting" : ""}`}>
+            <span className="media-status-dot" />
+            <div>
+              <b>{stream ? "Camera and microphone ready" : mediaRequested && !camError ? "Connecting camera and microphone…" : "Studio preview ready"}</b>
+              <span>
+                {stream
+                  ? "Record downloads the camera take and live graphic cues."
+                  : "Explore every graphic now. Enable your devices when you are ready to record."}
+              </span>
+            </div>
+          </div>
+          {!stream && phase !== "saving" ? (
+            <button className="big camera-start" onClick={requestMedia} disabled={mediaRequested && !camError}>
+              {mediaRequested && !camError ? "Connecting…" : camError ? "Try camera & microphone again" : "Enable camera & microphone"}
+            </button>
+          ) : phase === "saving" ? (
             <button className="big" disabled>
               Saving...
             </button>
@@ -1238,7 +1277,7 @@ const App: React.FC = () => {
               Starting in {count}... (R cancels)
             </button>
           ) : (
-            <button className="big rec" onClick={toggleRecord} disabled={!stream || (micId === "phone" && !phoneTrack)}>
+            <button className="big rec" onClick={toggleRecord} disabled={micId === "phone" && !phoneTrack}>
               ● Record <kbd>R</kbd>
             </button>
           )}
@@ -1315,6 +1354,14 @@ const App: React.FC = () => {
             Take shape: 1 matchup → 2 market (say research only) → 8 skill duels → 0 injuries (impact first) → 6 scheme. Other Sunday games in the dropdown.
           </div>
           {nextGroup ? <div className="hint">Next (Space): {nextGroup.label}</div> : null}
+          <div className="story-spine" aria-label="Suggested story order">
+            {storySteps.map((step, index) => (
+              <button key={step.key} className={step.index === groupIdx ? "on" : ""} onClick={() => showGroup(step.index)}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                {step.group.label}
+              </button>
+            ))}
+          </div>
         </section>
 
         <section className="graphics">
@@ -1522,6 +1569,8 @@ const App: React.FC = () => {
               >
                 {phoneHref}
               </button>
+              {/* This QR code belongs to the live control panel, not the rendered Remotion composition. */}
+              {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
               <img
                 alt="QR code for the phone mic link"
                 src={qrUrl(phoneHref)}

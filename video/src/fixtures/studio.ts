@@ -17,6 +17,7 @@ import type { MixTableProps } from "../studio/MixTable";
 import type { InjuryBoardProps } from "../studio/InjuryBoard";
 import type { ClashBoardProps } from "../studio/ClashBoard";
 import type { CoverHeatProps } from "../studio/CoverHeat";
+import type { QbStressTestProps } from "../studio/QbStressTest";
 
 export const SAMPLE_FORMATION: FormationProps = {
   "league": "nfl",
@@ -699,6 +700,41 @@ export const SAMPLE_COVER: CoverHeatProps = {
     { label: "Cover 1", rate: "25.3%", rateValue: 0.253, rateRank: 10, off: { value: 0.09, display: "+0.090", rank: 7, of: 32 }, opp: { value: 0.16, display: "+0.163", rank: 26, of: 32 } },
     { label: "Cover 2", rate: "24.2%", rateValue: 0.242, rateRank: 6, off: { value: 0.08, display: "+0.077", rank: 9, of: 32 }, opp: { value: 0.00, display: "+0.005", rank: 8, of: 32 } },
   ],
+};
+
+export const SAMPLE_QB_STRESS: QbStressTestProps = {
+  league: "nfl",
+  away: "CIN",
+  home: "HOU",
+  awayName: "Cincinnati Bengals",
+  homeName: "Houston Texans",
+  eyebrow: "Week 2 · Quarterbacks",
+  title: "Quarterback Stress Test",
+  note: "Burrow's best route is attacking zone. Houston's pressure profile is the collision that can change the game.",
+  awaySide: {
+    quarterback: { name: "Joe Burrow", team: "CIN", teamName: "Cincinnati Bengals", headshot: null, status: "Active", detail: "", position: "QB" },
+    defense: "HOU",
+    defenseName: "Houston Texans",
+    projection: "Model · 271 pass yds",
+    rows: [
+      { label: "Man coverage", offense: { value: 0.12, display: "+0.120", rank: 6, of: 32 }, defenseRate: { display: "31%", rank: 8 }, defense: { value: -0.03, display: "-0.030", rank: 7, of: 32 } },
+      { label: "Zone coverage", offense: { value: 0.16, display: "+0.160", rank: 3, of: 32 }, defenseRate: { display: "62%", rank: 12 }, defense: { value: 0.05, display: "+0.050", rank: 21, of: 32 } },
+      { label: "Blitz", offense: { value: 0.08, display: "+0.080", rank: 10, of: 32 }, defenseRate: { display: "28%", rank: 14 }, defense: { value: -0.01, display: "-0.010", rank: 11, of: 32 } },
+      { label: "Pressure", offense: { value: -0.12, display: "-0.120", rank: 25, of: 32 }, defenseRate: { display: "37%", rank: 5 }, defense: { value: -0.09, display: "-0.090", rank: 4, of: 32 } },
+    ],
+  },
+  homeSide: {
+    quarterback: { name: "C.J. Stroud", team: "HOU", teamName: "Houston Texans", headshot: null, status: "Active", detail: "", position: "QB" },
+    defense: "CIN",
+    defenseName: "Cincinnati Bengals",
+    projection: "Model · 249 pass yds",
+    rows: [
+      { label: "Man coverage", offense: { value: 0.07, display: "+0.070", rank: 12, of: 32 }, defenseRate: { display: "24%", rank: 22 }, defense: { value: 0.11, display: "+0.110", rank: 26, of: 32 } },
+      { label: "Zone coverage", offense: { value: 0.09, display: "+0.090", rank: 9, of: 32 }, defenseRate: { display: "69%", rank: 5 }, defense: { value: 0.04, display: "+0.040", rank: 19, of: 32 } },
+      { label: "Blitz", offense: { value: 0.14, display: "+0.140", rank: 4, of: 32 }, defenseRate: { display: "21%", rank: 26 }, defense: { value: 0.08, display: "+0.080", rank: 23, of: 32 } },
+      { label: "Pressure", offense: { value: -0.04, display: "-0.040", rank: 17, of: 32 }, defenseRate: { display: "29%", rank: 19 }, defense: { value: -0.01, display: "-0.010", rank: 13, of: 32 } },
+    ],
+  },
 };
 
 

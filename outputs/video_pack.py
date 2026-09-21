@@ -55,6 +55,7 @@ from outputs.video_studio import (
     player_items,
     prop_items,
     qb_matchup_item,
+    qb_stress_item,
     scheme_diagram_items,
     skill_duel_items,
     team_compare_item,
@@ -384,6 +385,9 @@ def build_nfl(a, g: dict) -> tuple[list[tuple[str, str, dict]], dict]:
     qb_card = qb_matchup_item(a, g, qa, qh)
     if qb_card:
         items.append(qb_card)
+    qb_stress = qb_stress_item(a, g, qa, qh)
+    if qb_stress:
+        items.append(qb_stress)
     items += skill_duel_items(a, g)
     items += scheme_diagram_items(a, g)
     items += clash_items(a, g, qa, qh)
