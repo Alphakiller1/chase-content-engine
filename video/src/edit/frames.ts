@@ -94,7 +94,7 @@ function frameGeomBase(format: "vertical" | "wide", platform: Platform, mode: La
     }
     return {
       width: W, height: H,
-      stage: { x: 72, y: 40, w: 1480, h: 860, scale: 0.78, visible: true },
+      stage: { x: 40, y: 36, w: 1380, h: 880, scale: 0.74, visible: true },
       insets: none,
       cam: bubbleCam,
       captions: { x: 232, y: 902, w: 1456, h: 158, align: "center", size: 46, lines: 2, plate: false },

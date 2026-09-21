@@ -1037,9 +1037,6 @@ const App: React.FC = () => {
 
   const cam = CAM[format];
   const G = frameGeom(format, format === "wide" ? "youtube" : platform, mode, cam, size);
-  const bubbleWide = format === "wide" && mode === "bubble";
-  const camX = bubbleWide ? 1920 - 48 - (G.cam.w || cam) : G.cam.x;
-  const camY = bubbleWide ? 48 : G.cam.y;
   const ring = teamAccent(cat.game.home, cat.game.league);
   const overlayProps = (what: OverlayKey): Record<string, unknown> => {
     if (what === "bug") {
@@ -1087,6 +1084,32 @@ const App: React.FC = () => {
     .map((step) => ({ ...step, group: groups[step.index] }));
   const teams = [cat.game.away, cat.game.home];
   const ringPad = G.cam.ring ? 5 : 0;
+  const pip = format === "wide" && mode === "bubble" && G.cam.w > 0;
+  const pipPx = Math.round(Math.max(120, Math.min(240, (frameBox.w || 960) * 0.15)));
+  const camRing = G.cam.ring ? `conic-gradient(from 200deg, ${ring}, var(--accent) 45%, ${ring})` : "transparent";
+  const camStyle = pip
+    ? {
+        top: 18,
+        right: 18,
+        left: "auto",
+        width: pipPx,
+        height: pipPx,
+        borderRadius: pipPx / 2,
+        padding: 5,
+        background: camRing,
+        opacity: 1,
+      }
+    : {
+        left: G.cam.x * scale,
+        top: G.cam.y * scale,
+        width: G.cam.w * scale,
+        height: G.cam.h * scale,
+        borderRadius: G.cam.r * scale,
+        padding: ringPad * scale,
+        background: camRing,
+        opacity: G.cam.w > 0 ? 1 : 0,
+      };
+  const camVideoRadius = pip ? Math.max(0, pipPx / 2 - 5) : Math.max(0, (G.cam.r - ringPad) * scale);
 
   return (
     <div className="booth">
@@ -1124,31 +1147,6 @@ const App: React.FC = () => {
               acknowledgeRemotionLicense
             />
             </div>
-            <div
-              className="cam-box"
-              style={{
-                left: camX,
-                top: camY,
-                width: G.cam.w,
-                height: G.cam.h,
-                borderRadius: G.cam.r,
-                padding: ringPad,
-                background: G.cam.ring ? `conic-gradient(from 200deg, ${ring}, var(--accent) 45%, ${ring})` : "transparent",
-                opacity: G.cam.w > 0 ? 1 : 0,
-              }}
-            >
-              {/* eslint-disable-next-line @remotion/warn-native-media-tag -- this is a live MediaStream preview, not timeline media. */}
-              <video
-                ref={videoRef}
-                autoPlay
-                muted
-                playsInline
-                style={{ borderRadius: Math.max(0, G.cam.r - ringPad), transform: mirror ? "scaleX(-1)" : undefined }}
-              />
-              {/* Keep WebRTC phone audio playing so MediaRecorder gets samples. This is a live MediaStream, not timeline media. */}
-              {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
-              <audio ref={phoneAudioRef} autoPlay playsInline style={{ display: "none" }} />
-            </div>
             <svg
               ref={svgRef}
               width={W}
@@ -1168,6 +1166,19 @@ const App: React.FC = () => {
                 </g>
               ))}
             </svg>
+          </div>
+          <div className={pip ? "cam-box cam-pip" : "cam-box"} style={camStyle}>
+            {/* eslint-disable-next-line @remotion/warn-native-media-tag -- this is a live MediaStream preview, not timeline media. */}
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              playsInline
+              style={{ borderRadius: camVideoRadius, transform: mirror ? "scaleX(-1)" : undefined }}
+            />
+            {/* Keep WebRTC phone audio playing so MediaRecorder gets samples. This is a live MediaStream, not timeline media. */}
+            {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
+            <audio ref={phoneAudioRef} autoPlay playsInline style={{ display: "none" }} />
           </div>
           {format === "vertical" && showZones ? (
             <div className="zone" style={{ height: SAFE_BOTTOM[platform] * scale, width: W * scale }}>

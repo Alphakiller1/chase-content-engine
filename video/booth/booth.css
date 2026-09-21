@@ -87,6 +87,7 @@ body,
   width: min(100cqi, calc(100cqb * var(--ar)));
   height: min(100cqb, calc(100cqi / var(--ar)));
   position: relative;
+  isolation: isolate;
   overflow: hidden;
   border-radius: 14px;
   outline: 1px solid var(--border-hover);
@@ -352,7 +353,7 @@ kbd {
 }
 .cam-box {
   position: absolute;
-  z-index: 6;
+  z-index: 30;
   box-sizing: border-box;
   overflow: hidden;
   pointer-events: none;
@@ -360,6 +361,10 @@ kbd {
     width 450ms cubic-bezier(0.16, 1, 0.3, 1), height 450ms cubic-bezier(0.16, 1, 0.3, 1),
     border-radius 450ms cubic-bezier(0.16, 1, 0.3, 1), opacity 250ms;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.cam-box.cam-pip {
+  left: auto;
+  bottom: auto;
 }
 .cam-box video {
   width: 100%;
