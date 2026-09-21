@@ -1036,7 +1036,10 @@ const App: React.FC = () => {
   if (!cat) return <div className="fatal">Loading...</div>;
 
   const cam = CAM[format];
-  const G = frameGeom(format, format === "wide" ? "youtube" : platform, mode, cam);
+  const G = frameGeom(format, format === "wide" ? "youtube" : platform, mode, cam, size);
+  const bubbleWide = format === "wide" && mode === "bubble";
+  const camX = bubbleWide ? 1920 - 36 - (G.cam.w || cam) : G.cam.x;
+  const camY = bubbleWide ? 36 : G.cam.y;
   const ring = teamAccent(cat.game.home, cat.game.league);
   const overlayProps = (what: OverlayKey): Record<string, unknown> => {
     if (what === "bug") {
@@ -1107,8 +1110,8 @@ const App: React.FC = () => {
             <div
               className="cam-box"
               style={{
-                left: G.cam.x,
-                top: G.cam.y,
+                left: camX,
+                top: camY,
                 width: G.cam.w,
                 height: G.cam.h,
                 borderRadius: G.cam.r,
