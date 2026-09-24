@@ -15,7 +15,12 @@ export const captureProgram = async (el: HTMLElement): Promise<MediaStream> => {
     /* older Chrome */
   }
   const display = await navigator.mediaDevices.getDisplayMedia({
-    video: { frameRate: 30, displaySurface: "browser" },
+    video: {
+      frameRate: { ideal: 30, max: 30 },
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+      displaySurface: "browser",
+    },
     audio: false,
     preferCurrentTab: true,
     selfBrowserSurface: "include",
@@ -23,6 +28,8 @@ export const captureProgram = async (el: HTMLElement): Promise<MediaStream> => {
     monitorTypeSurfaces: "exclude",
     ...(controller ? { controller } : {}),
   } as DisplayMediaStreamOptions);
+  const track = display.getVideoTracks()[0];
+  if (track) track.contentHint = "detail";
   await cropProgram(display, el);
   return display;
 };

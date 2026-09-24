@@ -17,7 +17,7 @@ import "../src/theme.css";
 import "./booth.css";
 import { STATIC, downloadBlob, url } from "./host";
 import { boothRoom, micUrl, peerIdFor, qrUrl } from "./phoneLink";
-import { captureProgram, cropProgram, withAudio } from "./composite";
+import { captureProgram, withAudio } from "./composite";
 
 /* ── types ────────────────────────────────────────────────────────────────── */
 
@@ -777,6 +777,7 @@ const App: React.FC = () => {
       setStrokes([]);
     };
     rec.onstop = async () => {
+      playerRef.current?.play();
       recStream.getTracks().forEach((t) => t.stop());
       programCapture.current?.getTracks().forEach((t) => t.stop());
       programCapture.current = null;
@@ -862,10 +863,17 @@ const App: React.FC = () => {
     return () => clearTimeout(id);
   }, [beginRecording, count, phase]);
 
+  /* Crop once, when the share starts. Re-cropping on each graphic froze the first board in the file. */
   useEffect(() => {
-    if (!programLive || !programCapture.current || !frameRef.current) return;
-    void cropProgram(programCapture.current, frameRef.current);
-  }, [programLive, currentKey, mode, size, format]);
+    if (!recording) return;
+    const player = playerRef.current;
+    if (!player) return;
+    const wait = instant ? 350 : 1700;
+    const id = window.setTimeout(() => {
+      if (recRef.current?.state === "recording") player.pause();
+    }, wait);
+    return () => window.clearTimeout(id);
+  }, [recording, nonce, instant]);
 
   const makeVideo = useCallback(async () => {
     const r = await fetch(`/api/edit?name=${saved}&ext=webm&platform=${platform}`, { method: "POST" });
