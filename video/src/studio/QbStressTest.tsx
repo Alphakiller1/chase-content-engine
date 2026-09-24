@@ -53,8 +53,8 @@ export type QbStressTestProps = {
 const edgeFor = (row: StressRow) => {
   if (!row.offense.rank || !row.defense.rank) return { label: "No edge", tone: "var(--text-muted)" };
   const gap = row.defense.rank - row.offense.rank;
-  if (gap >= 7) return { label: "QB edge", tone: "var(--mark-positive)" };
-  if (gap <= -7) return { label: "DEF edge", tone: "var(--mark-negative)" };
+  if (gap >= 7) return { label: "QB edge", tone: toneFromRank(row.offense.rank, row.offense.of) };
+  if (gap <= -7) return { label: "DEF edge", tone: toneFromRank(row.defense.rank, row.defense.of) };
   return { label: "Toss-up", tone: "var(--mark-caution)" };
 };
 

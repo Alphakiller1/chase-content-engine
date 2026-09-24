@@ -74,7 +74,7 @@ const Cell: React.FC<{
 }> = ({ text, rank, of, cat, invert, at, size, rankH }) => {
   const n = parseStat(text);
   const epa = Number.isFinite(n) && /^[+-]\d/.test(String(text).trim());
-  const tone = epa ? toneFromEpa(n, Boolean(invert && cat === "quality")) : toneFromRank(rank, of, cat, invert);
+  const tone = rank ? toneFromRank(rank, of, "quality") : epa ? toneFromEpa(n, Boolean(invert && cat === "quality")) : toneFromRank(rank, of, cat);
   return (
     <div style={{ textAlign: "right" }}>
           <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: size, color: tone, lineHeight: 1 }}>
@@ -168,7 +168,6 @@ export const MixTable: React.FC<MixTableProps> = ({
 
         {rows.map((r, i) => {
           const at = stagger(i, 0.2, 0.07);
-          const rateTone = toneFromRank(r.statRank, r.of, "rate");
           return (
             <div
               key={r.label}
@@ -185,20 +184,17 @@ export const MixTable: React.FC<MixTableProps> = ({
             >
               <div style={{ fontWeight: 700, fontSize: wide ? 16 : 17, color: "var(--text-primary)", lineHeight: 1.2 }}>{r.label}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 10 }}>
-                <Pips usage={r.usage} color={rateTone} at={at} />
+                <Pips usage={r.usage} color="var(--text-accent)" at={at} />
                 <div style={{ minWidth: 78, textAlign: "right" }}>
-                  <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: num, color: rateTone }}>
+                  <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: num, color: "var(--text-primary)" }}>
                     <Count text={r.usageDisplay} at={at} />
-                  </div>
-                  <div style={{ height: rankH, fontWeight: 800, fontSize: Math.round(num * 0.5), color: rateTone, marginTop: 2, opacity: r.statRank ? 1 : 0 }}>
-                    {r.statRank ? ordinal(r.statRank) : ""}
                   </div>
                 </div>
               </div>
               <div className="num" style={{ textAlign: "right", fontFamily: "var(--font-display)", fontWeight: 700, fontSize: num - 2, color: toneFromRank(null, 32, "count") }}>
                 {r.count || "—"}
               </div>
-              <Cell text={r.stat} rank={null} of={r.of} cat="quality" invert={statInvert} at={at} size={num} rankH={rankH} />
+              <Cell text={r.stat} rank={r.statRank} of={r.of} cat="quality" invert={statInvert} at={at} size={num} rankH={rankH} />
               <Cell text={r.opp} rank={r.oppRank} of={r.of} cat="rate" at={at} size={num} rankH={rankH} />
               <Cell text={r.extra} rank={r.extraRank} of={r.of} cat="quality" at={at} size={num} rankH={rankH} />
             </div>

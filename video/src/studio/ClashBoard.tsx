@@ -129,7 +129,7 @@ export const ClashBoard: React.FC<ClashBoardProps> = ({
                 {rows.map((r) => (
                   <div key={r.label} style={{ display: "grid", gridTemplateColumns: "minmax(0,1.1fr) 110px 110px", columnGap: 10, alignItems: "center", minHeight: 58, borderBottom: "1px solid var(--border-card)" }}>
                     <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>{r.label}</div>
-                    <Num text={r.a.display} rank={r.a.rank} of={r.a.of} at={0.3} tone={r.epa ? toneFromEpa(r.a.value ?? 0) : toneFromRank(r.a.rank, r.a.of)} />
+                    <Num text={r.a.display} rank={r.a.rank} of={r.a.of} at={0.3} tone={r.a.rank ? toneFromRank(r.a.rank, r.a.of) : toneFromEpa(r.a.value ?? 0)} />
                     <Num text={r.b.display} rank={r.b.rank} of={r.b.of} at={0.34} tone={r.b.rank ? toneFromRank(r.b.rank, r.b.of) : toneFromEpa(r.b.value ?? 0, true)} />
                   </div>
                 ))}
