@@ -127,7 +127,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
             const at = stagger(i, 0.18, 0.05);
             const grow = progress(frame, fps, at, 0.65, EASE_DRAW);
             const cat = catOf(rankKind, r.better);
-            const invert = r.better === "low";
+            const invert = false;
             const bar = (s: Side, left: boolean) => {
               const tone = toneFromRank(s.rank, s.of, cat === "identity" ? "quality" : cat, invert);
               const known = Boolean(s.rank && s.of);

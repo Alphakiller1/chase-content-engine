@@ -105,8 +105,8 @@ export const CoverHeat: React.FC<CoverHeatProps> = ({
                   <div style={{ marginTop: 3, fontWeight: 800, fontSize: 12, color: mixTone }}>{s.rateRank ? ordinal(s.rateRank) : "—"}</div>
                 </div>
               </div>
-              <Cell text={s.off.display} rank={s.off.rank} tone={toneFromEpa(s.off.value ?? 0)} at={at} />
-              <Cell text={s.opp.display} rank={s.opp.rank} tone={toneFromEpa(s.opp.value ?? 0, true)} at={at} />
+              <Cell text={s.off.display} rank={s.off.rank} tone={s.off.rank ? toneFromRank(s.off.rank, s.off.of) : toneFromEpa(s.off.value ?? 0)} at={at} />
+              <Cell text={s.opp.display} rank={s.opp.rank} tone={s.opp.rank ? toneFromRank(s.opp.rank, s.opp.of) : toneFromEpa(s.opp.value ?? 0, true)} at={at} />
             </div>
           );
         })}

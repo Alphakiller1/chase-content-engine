@@ -83,7 +83,7 @@ export const TeamCompare: React.FC<TeamCompareProps> = ({
     const stats = [
       { k: "Power", v: s.rating, r: s.rank, c: power },
       { k: "Off. EPA", v: s.offEpa, r: s.offEpaRank ?? null, c: toneFromRank(s.offEpaRank ?? null, of, "quality") },
-      { k: "Def. EPA", v: s.defEpa, r: s.defEpaRank ?? null, c: toneFromRank(s.defEpaRank ?? null, of, "quality", true) },
+      { k: "Def. EPA", v: s.defEpa, r: s.defEpaRank ?? null, c: toneFromRank(s.defEpaRank ?? null, of, "quality") },
       { k: "Proj", v: s.score, r: null, c: i === 0 ? scorePair.a : scorePair.b },
     ];
     return (

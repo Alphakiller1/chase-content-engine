@@ -18,8 +18,12 @@ const stepAt = (t: number) => METRIC_STEPS[Math.max(0, Math.min(6, Math.round(t 
 export const MIX_SEGMENTS = ["#8B7CFF", "#4ADE80", "#38BDF8", "#F5B942", "#F2545B", "#E879F9", "#94A3B8"] as const;
 export const toneFromMix = (i: number) => MIX_SEGMENTS[i % MIX_SEGMENTS.length];
 
-/** Rank 1 is best (quality) or most often (rate). `invert` flips so 1 is worst. */
-export const toneFromRank = (rank: number | null, of: number, cat: StatCat = "quality", invert = false) => {
+/**
+ * Rank 1 is always the productive end of that stat, offense or defense.
+ * A top-10 rank in a 32-team pool stays on the green steps. The invert flag is
+ * ignored: league ranks are already stored as 1 = best.
+ */
+export const toneFromRank = (rank: number | null, of: number, cat: StatCat = "quality", _invert = false) => {
   if (cat === "count") return "var(--text-secondary)";
   if (cat === "identity") return "var(--text-primary)";
   if (cat === "market") return "var(--text-accent)";
@@ -27,8 +31,13 @@ export const toneFromRank = (rank: number | null, of: number, cat: StatCat = "qu
     if (cat === "rate") return "var(--text-accent)";
     return "var(--text-muted)";
   }
-  const q = (rank - 1) / Math.max(1, of - 1);
-  return stepAt(invert ? q : 1 - q);
+  const top = Math.max(1, Math.round((of * 10) / 32));
+  if (rank <= top) {
+    const t = 1 - (rank - 1) / Math.max(1, top - 1);
+    return METRIC_STEPS[4 + Math.round(t * 2)];
+  }
+  const q = (rank - top) / Math.max(1, of - top);
+  return METRIC_STEPS[Math.max(0, 3 - Math.round(Math.min(1, q) * 3))];
 };
 
 /** Typical EPA/play band (−0.20 … +0.20) on the 7-step scale. */
