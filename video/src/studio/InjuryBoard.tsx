@@ -97,9 +97,8 @@ export const InjuryBoard: React.FC<InjuryBoardProps> = ({
     (a, b) => impactOf(b) - impactOf(a) || rankOf(a.status) - rankOf(b.status) || a.position.localeCompare(b.position),
   );
   const face = 40;
-  const rowH = wide ? 56 : 60;
-  const avail = height - safe.top - safe.bottom - (wide ? 150 : 180);
-  const shown = listed.slice(0, Math.max(1, Math.floor(avail / rowH)));
+  const rowH = wide ? 42 : 46;
+  const shown = listed;
   const cols = "44px minmax(180px,1.4fr) 150px 88px minmax(80px,1fr)";
 
   const counts = ORDER.map((k) => ({
@@ -124,7 +123,7 @@ export const InjuryBoard: React.FC<InjuryBoardProps> = ({
         opacity: exit,
       }}
     >
-      <Fit min={0.94}>
+      <Fit min={0.62}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, ...rise(frame, fps, 0) }}>
           <TeamLogo team={team} league={league} size={28} />
           <div style={{ minWidth: 0, flex: 1 }}>

@@ -1048,35 +1048,93 @@ def formation_items(a, g: dict) -> list[tuple[str, str, dict]]:
     return items
 
 
-def _injury_impact(pos: str, starter: bool, depth_rank: int | None) -> tuple[int, str]:
+def _injury_impact(pos: str, starter: bool, depth_rank: int | None, status: str = "") -> tuple[int, str]:
     """1–5: how much this designation actually moves the club."""
     p = (pos or "").upper()
-    skill = p in {"QB", "RB", "FB", "WR", "TE"}
+    st = (status or "").lower()
+    skill = p in {"QB", "RB", "FB", "WR", "TE", "CB"}
     ol = p in {"OT", "OL", "G", "C", "T", "LT", "RT", "LG", "RG"}
+    front = p in {"DE", "EDGE", "OLB", "DT", "LB", "S", "NT"}
+    if st == "available":
+        return 1, "Available"
     if starter and p == "QB":
         return 5, "Franchise"
     if starter and (skill or ol):
         return 4, "Core"
     if starter:
         return 3, "Starter"
-    # Injured names often drop off the listed 11; depth chart 1 still counts.
-    if depth_rank == 1:
+    # Injured names drop off the listed 11. Depth 1 is still a starter.
+    # A missing depth rank on IR/Out is not a backup — Terrell is the CB, not rotation.
+    if depth_rank == 1 or (depth_rank is None and st in {"injured reserve", "out", "doubtful", "questionable"} and (skill or ol or front)):
         if p == "QB":
             return 5, "Franchise"
         if skill or ol:
             return 4, "Core"
         return 3, "Starter"
-    if depth_rank == 2 or skill or p in {"DE", "EDGE", "OLB", "DT", "CB"}:
+    if depth_rank == 2:
         return 2, "Rotation"
     return 1, "Depth"
 
 
+_INJURY_FEED = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/injuries"
+_INJURY_KEEP = {"out", "doubtful", "questionable", "injured reserve", "pup", "suspended", "nfi"}
+_INJURY_WORD = re.compile(r"participant|designation|thursday", re.I)
+
+
+def _espn_injury_rows(team_name: str) -> list[dict]:
+    """Full club injury report, including players who practiced but carry no game tag."""
+    if not hasattr(_espn_injury_rows, "cache"):
+        try:
+            from outputs.content_engine import _fetch
+            _espn_injury_rows.cache = json.loads(_fetch(_INJURY_FEED, timeout=60))
+        except Exception as exc:
+            print(f"[video-studio] injury feed unavailable: {exc}")
+            _espn_injury_rows.cache = {}
+    want = team_name.lower()
+    block = next(
+        (b for b in (_espn_injury_rows.cache.get("injuries") or [])
+         if str(b.get("displayName") or "").lower() == want),
+        None,
+    )
+    if not block:
+        return []
+    rows = []
+    for it in block.get("injuries") or []:
+        status = str(it.get("status") or "")
+        comment = str(it.get("shortComment") or "")
+        keep = status.lower() in _INJURY_KEEP or (status.lower() == "active" and _INJURY_WORD.search(comment))
+        if not keep:
+            continue
+        ath = it.get("athlete") or {}
+        pos = ((ath.get("position") or {}).get("abbreviation")) or ""
+        detail = ""
+        found = re.search(r"\(([^)]+)\)", comment)
+        if found:
+            detail = found.group(1)
+        elif isinstance(it.get("details"), dict):
+            detail = str((it.get("details") or {}).get("detail") or "")
+        game_status = "Available" if status.lower() == "active" else status
+        rows.append({
+            "name": ath.get("displayName") or "",
+            "position": pos,
+            "status": game_status,
+            "detail": detail if detail.lower() not in {"not specified", ""} else "",
+        })
+    return [r for r in rows if r["name"]]
+
+
 def injury_items(a, g: dict) -> list[tuple[str, str, dict]]:
-    """One injury-report board per club, from the site's availability list."""
+    """One injury-report board per club: game tags plus everyone still on the report."""
     items = []
     for side in ("away", "home"):
         team = g[side].upper()
-        report = g.get(f"{side}_availability_list") or []
+        report = list(g.get(f"{side}_availability_list") or [])
+        seen = {_key(x.get("name") or "") for x in report}
+        for extra in _espn_injury_rows(g.get(f"{side}_name", team)):
+            if _key(extra["name"]) in seen:
+                continue
+            report.append(extra)
+            seen.add(_key(extra["name"]))
         faces = {}
         starters = set()
         depth: dict[str, int] = {}
@@ -1096,7 +1154,7 @@ def injury_items(a, g: dict) -> list[tuple[str, str, dict]]:
             k = _key(name)
             pos = x.get("position") or ""
             listed = k in starters
-            impact, impact_label = _injury_impact(pos, listed, depth.get(k))
+            impact, impact_label = _injury_impact(pos, listed, depth.get(k), x.get("status") or "")
             rows.append({
                 "name": name,
                 "position": pos,
@@ -1113,7 +1171,7 @@ def injury_items(a, g: dict) -> list[tuple[str, str, dict]]:
             "eyebrow": f"{a.tag} · Injury report",
             "title": f"{g.get(f'{side}_name', team).split(' ')[-1]} Report",
             "rows": rows,
-            "note": "Sorted by who actually changes the game: Franchise, Core, Starter, Rotation, Depth. Questionable is not inactive.",
+            "note": "Out, doubtful, questionable and IR, plus players who were on the report and are available. A missing depth chart does not make a starter rotation.",
         }))
     return items
 
