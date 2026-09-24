@@ -7,7 +7,7 @@ import { League, teamAccent } from "../teams";
 import { BroadcastBackdrop, BroadcastHeader, BroadcastPanel, InsightFooter } from "./BroadcastChrome";
 import { Count, Fit, Sheen } from "./live";
 import type { QbFace } from "./QbMatchup";
-import { ordinal, toneFromRank } from "./statColor";
+import { ordinal, rankFill, toneFromRank } from "./statColor";
 import "../fonts";
 
 export type StressStat = {
@@ -180,7 +180,7 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
             const edge = edgeFor(row, edgeOff, edgeDef);
             const offTone = toneFromRank(row.offense.rank, row.offense.of);
             const defTone = toneFromRank(row.defense.rank, row.defense.of);
-            const freqWidth = Math.max(8, Math.min(100, Number.parseFloat(row.defenseRate.display) || 0));
+            const freqWidth = rankFill(row.defenseRate.rank, 32) * 100;
             return (
               <div
                 key={row.label}
@@ -213,7 +213,7 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
                     <Count text={row.defenseRate.display} at={at + 0.18 + rowIndex * 0.05} />
                   </div>
                   <div style={{ height: 4, marginTop: 6, marginLeft: "auto", maxWidth: 92, borderRadius: 4, overflow: "hidden", background: "var(--border-card)" }}>
-                    <div style={{ width: `${freqWidth}%`, height: "100%", marginLeft: "auto", background: defenseAccent }} />
+                    <div style={{ width: `${freqWidth}%`, height: "100%", marginLeft: "auto", background: defTone }} />
                   </div>
                   <div style={{ marginTop: 4, fontSize: wide ? 11 : 13, fontWeight: 850, color: "var(--text-secondary)" }}>
                     {rankLabel(row.defenseRate.rank, "most")}

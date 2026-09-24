@@ -1,5 +1,6 @@
 import { AbsoluteFill, Interactive, useCurrentFrame, useVideoConfig } from "remotion";
 import { Caps, Deck, Eyebrow, TeamLogo } from "../ds/kit";
+import { rankFill } from "../studio/statColor";
 import { EASE_DRAW, exitAt, progress, rise } from "../ds/motion";
 import { Platform, useSafe } from "../ds/safe";
 import { League, teamAccent } from "../teams";
@@ -113,14 +114,14 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
                   : "transparent",
               }}
             >
-              {typeof it.share === "number" ? (
+              {it.rank ? (
                 <div
                   style={{
                     position: "absolute",
                     left: 0,
                     top: "18%",
                     bottom: "18%",
-                    width: `${Math.max(0, Math.min(1, it.share)) * 100 * fill}%`,
+                    width: `${rankFill(it.rank, 32) * 100 * fill}%`,
                     background: `color-mix(in srgb, ${ink} 16%, transparent)`,
                     borderRadius: 4,
                   }}

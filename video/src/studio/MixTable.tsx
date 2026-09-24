@@ -5,7 +5,7 @@ import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League } from "../teams";
 import { Count, Fit } from "./live";
-import { ordinal, parseStat, toneFromEpa, toneFromRank, type StatCat } from "./statColor";
+import { ordinal, parseStat, rankFill, toneFromEpa, toneFromRank, type StatCat } from "./statColor";
 import "../fonts";
 
 export type MixRow = {
@@ -184,7 +184,7 @@ export const MixTable: React.FC<MixTableProps> = ({
             >
               <div style={{ fontWeight: 700, fontSize: wide ? 16 : 17, color: "var(--text-primary)", lineHeight: 1.2 }}>{r.label}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 10 }}>
-                <Pips usage={r.usage} color="var(--text-accent)" at={at} />
+                <Pips usage={r.statRank ? rankFill(r.statRank, r.of) : r.usage} color={toneFromRank(r.statRank, r.of, "quality")} at={at} />
                 <div style={{ minWidth: 78, textAlign: "right" }}>
                   <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: num, color: "var(--text-primary)" }}>
                     <Count text={r.usageDisplay} at={at} />

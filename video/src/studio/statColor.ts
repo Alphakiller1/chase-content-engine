@@ -40,7 +40,11 @@ export const toneFromRank = (rank: number | null, of: number, cat: StatCat = "qu
   return METRIC_STEPS[Math.max(0, 3 - Math.round(Math.min(1, q) * 3))];
 };
 
-/** Typical EPA/play band (−0.20 … +0.20) on the 7-step scale. */
+/** Bar length for a league rank. 1st fills the track; 32nd is a stub. Not the raw percent. */
+export const rankFill = (rank: number | null, of = 32) => {
+  if (!rank || !of) return 0.08;
+  return Math.max(0.08, (of - rank + 1) / of);
+};
 export const toneFromEpa = (v: number, invert = false) => {
   const t = Math.max(0, Math.min(1, (v + 0.2) / 0.4));
   return stepAt(invert ? 1 - t : t);

@@ -4,7 +4,7 @@ import { EASE_DRAW, exitAt, progress, rise } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League } from "../teams";
 import { Count, Fit } from "./live";
-import { ordinal, toneFromEpa, toneFromRank } from "./statColor";
+import { ordinal, rankFill, toneFromEpa, toneFromRank } from "./statColor";
 import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
@@ -58,7 +58,6 @@ export const CoverHeat: React.FC<CoverHeatProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const maxMix = Math.max(...shells.map((s) => s.rateValue || 0), 0.01);
   const cols = "minmax(140px,1.1fr) minmax(180px,1.3fr) 130px 150px";
 
   return (
@@ -90,7 +89,7 @@ export const CoverHeat: React.FC<CoverHeatProps> = ({
           const at = 0.16 + i * 0.05;
           const grow = progress(frame, fps, at, 0.55, EASE_DRAW);
           const mixTone = toneFromRank(s.rateRank, 32, "rate");
-          const bar = Math.max(0.06, (s.rateValue || 0) / maxMix);
+          const bar = rankFill(s.rateRank, 32);
           return (
             <div key={s.label} style={{ display: "grid", gridTemplateColumns: cols, columnGap: 14, alignItems: "center", minHeight: wide ? 64 : 58, borderBottom: "1px solid var(--border-card)", ...rise(frame, fps, at, 6) }}>
               <div style={{ fontWeight: 750, fontSize: 18, color: "var(--text-primary)" }}>{s.label}</div>
