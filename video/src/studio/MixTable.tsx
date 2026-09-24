@@ -52,7 +52,7 @@ const Pips: React.FC<{ usage: number; color: string; at: number }> = ({ usage, c
           key={i}
           style={{
             flex: 1,
-            height: 12,
+            height: 8,
             borderRadius: 1,
             background: i < filled ? color : "var(--border-card)",
           }}
@@ -109,9 +109,9 @@ export const MixTable: React.FC<MixTableProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const padX = wide ? 72 : 44;
-  const num = wide ? 32 : 34;
-  const rankH = wide ? 20 : 22;
+  const padX = wide ? 56 : 40;
+  const num = wide ? 22 : 24;
+  const rankH = wide ? 14 : 16;
 
   const heads = [
     { k: "name", t: "", align: "left" as const },
@@ -128,29 +128,29 @@ export const MixTable: React.FC<MixTableProps> = ({
       style={{
         background: "var(--surface-page)",
         fontFamily: "var(--font-body)",
-        paddingTop: safe.top + (wide ? 44 : 48),
-        paddingBottom: safe.bottom + 20,
+        paddingTop: safe.top + (wide ? 28 : 36),
+        paddingBottom: safe.bottom + 16,
         paddingLeft: padX,
         paddingRight: padX,
         opacity: exit,
       }}
     >
       <Fit>
-        <div style={{ display: "flex", alignItems: "center", gap: 16, ...rise(frame, fps, 0) }}>
-          <TeamLogo team={team} league={league} size={wide ? 64 : 72} />
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, ...rise(frame, fps, 0) }}>
           <div style={{ minWidth: 0 }}>
-            <div className="chrome" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 48 : 52, lineHeight: 0.95 }}>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 36 : 32, letterSpacing: "-0.03em", lineHeight: 1.05, color: "var(--text-primary)" }}>
               {title}
             </div>
-            <Caps size={wide ? 18 : 20} color="var(--text-accent)" style={{ marginTop: 8 }}>
-              {eyebrow} · {teamName} · {subtitle}
-            </Caps>
+            <div style={{ marginTop: 8, fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-accent)" }}>
+              {teamName} · {subtitle}
+            </div>
           </div>
+          <TeamLogo team={team} league={league} size={wide ? 28 : 32} />
         </div>
 
         <div
           style={{
-            marginTop: wide ? 20 : 24,
+            marginTop: wide ? 16 : 18,
             display: "grid",
             gridTemplateColumns: COLS,
             columnGap: 12,
@@ -177,13 +177,13 @@ export const MixTable: React.FC<MixTableProps> = ({
                 gridTemplateColumns: COLS,
                 columnGap: 12,
                 alignItems: "center",
-                minHeight: wide ? 64 : 72,
-                padding: wide ? "8px 0" : "10px 0",
+                minHeight: wide ? 52 : 56,
+                padding: wide ? "6px 0" : "8px 0",
                 borderBottom: "1px solid var(--border-card)",
                 ...rise(frame, fps, at, 8),
               }}
             >
-              <div style={{ fontWeight: 800, fontSize: wide ? 24 : 26, color: "var(--text-primary)", lineHeight: 1.15 }}>{r.label}</div>
+              <div style={{ fontWeight: 700, fontSize: wide ? 16 : 17, color: "var(--text-primary)", lineHeight: 1.2 }}>{r.label}</div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-start", gap: 10 }}>
                 <Pips usage={r.usage} color={rateTone} at={at} />
                 <div style={{ minWidth: 78, textAlign: "right" }}>

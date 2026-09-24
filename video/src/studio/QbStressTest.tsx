@@ -3,7 +3,7 @@ import { AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig } from "
 import { Caps, StatusPill, TeamLogo } from "../ds/kit";
 import { exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
-import { League, teamAccent, teamColors } from "../teams";
+import { League, teamAccent } from "../teams";
 import { BroadcastBackdrop, BroadcastHeader, BroadcastPanel, InsightFooter } from "./BroadcastChrome";
 import { Count, Fit, Sheen } from "./live";
 import type { QbFace } from "./QbMatchup";
@@ -88,7 +88,6 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
     const qb = side.quarterback;
     const accent = teamAccent(qb.team, league);
     const defenseAccent = teamAccent(side.defense, league);
-    const { primary, secondary } = teamColors(qb.team, league);
     const at = 0.12 + index * 0.1;
     const portraitSize = wide ? 94 : 104;
 
@@ -118,15 +117,15 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
               height: portraitSize,
               overflow: "hidden",
               position: "relative",
-              borderRadius: 18,
-              background: `linear-gradient(145deg, ${primary}, ${secondary})`,
-              boxShadow: "0 14px 30px rgba(0,0,0,.35)",
+              borderRadius: "50%",
+              background: "var(--surface-card)",
+              boxShadow: "none",
             }}
           >
             {qb.headshot ? (
               <Img
                 src={staticFile(qb.headshot)}
-                style={{ position: "absolute", inset: "7% 5% 0", width: "90%", height: "93%", objectFit: "cover", objectPosition: "top center" }}
+                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
               />
             ) : (
               <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 900 }}>

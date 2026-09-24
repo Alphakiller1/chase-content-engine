@@ -1,10 +1,10 @@
 import React from "react";
 import { AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, StatusPill, TeamLogo } from "../ds/kit";
+import { Caps, TeamLogo } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
-import { League, teamAccent, teamColors } from "../teams";
-import { Count, Fit, Sheen } from "./live";
+import { League, teamAccent } from "../teams";
+import { Count, Fit } from "./live";
 import { toneFromPair } from "./statColor";
 import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
@@ -53,12 +53,6 @@ export type QbMatchupProps = {
   starts?: QbStart[];
 };
 
-const last = (n: string) => {
-  const parts = n.replace(/\s+(Jr\.?|Sr\.?|II|III|IV)$/i, "").split(" ");
-  return parts.length > 1 ? parts.slice(1).join(" ") : n;
-};
-const first = (n: string) => n.split(" ")[0];
-
 /**
  * Two skill starters face to face: this season's starts, a season aggregate,
  * and (for QBs) the model's next-game note. Same board for QB, WR and RB.
@@ -78,89 +72,29 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const padX = wide ? 90 : 52;
   const inkA = teamAccent(awayQb.team, league);
   const inkH = teamAccent(homeQb.team, league);
 
   const portrait = (q: QbFace, ink: string, at: number) => {
-    const { primary, secondary } = teamColors(q.team, league);
-    const size = starts.length ? (wide ? 180 : 132) : wide ? 280 : 220;
-    const inP = progress(frame, fps, at, 0.7);
+    const size = wide ? 88 : 96;
+    const inP = progress(frame, fps, at, 0.55);
     return (
-      <div style={{ width: size, textAlign: "center", opacity: inP, translate: `0px ${(1 - inP) * 24}px` }}>
-        <div
-          style={{
-            position: "relative",
-            width: size,
-            height: size,
-            borderRadius: 28,
-            overflow: "hidden",
-            background: `linear-gradient(150deg, ${primary}, ${secondary})`,
-            boxShadow: "0 24px 50px rgba(0,0,0,.45)",
-          }}
-        >
-          <Sheen period={5} delay={1.4} opacity={0.12} />
-          <div style={{ position: "absolute", right: -size * 0.2, bottom: -size * 0.22, opacity: 0.22 }}>
-            <TeamLogo team={q.team} league={league} size={size * 0.85} />
+      <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0, opacity: inP }}>
+        {q.headshot ? (
+          <Img src={staticFile(q.headshot)} style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", background: "var(--surface-card)", flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--surface-card)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+            <TeamLogo team={q.team} league={league} size={size * 0.5} />
           </div>
-          {q.headshot ? (
-            <Img
-              src={staticFile(q.headshot)}
-              style={{
-                position: "absolute",
-                left: size * 0.08,
-                bottom: 0,
-                width: size * 0.84,
-                height: size * 0.84,
-                objectFit: "cover",
-                filter: "drop-shadow(0 16px 24px rgba(0,0,0,.45))",
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#fff",
-                fontFamily: "var(--font-display)",
-                fontWeight: 800,
-                fontSize: size * 0.22,
-              }}
-            >
-              {q.position || "QB"}
-            </div>
-          )}
-        </div>
-        <Caps size={wide ? 20 : 22} color={ink} style={{ marginTop: 14 }}>
-          {q.team} · {q.teamName.split(" ").slice(-1)[0]}
-        </Caps>
-        <div
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 800,
-          fontSize: Math.round(size * 0.18),
-            color: "var(--text-primary)",
-            marginTop: 4,
-          }}
-        >
-          {first(q.name)}
-        </div>
-        <div
-          className="chrome"
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 800,
-            fontSize: Math.round(size * 0.28),
-            lineHeight: 0.95,
-          }}
-        >
-          {last(q.name)}
-        </div>
-        <div style={{ marginTop: 10, display: "flex", justifyContent: "center" }}>
-          <StatusPill status={q.status || "Active"} size={wide ? 18 : 20} />
+        )}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: ink }}>
+            {q.teamName} · {q.position || "QB"}
+          </div>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 28 : 26, letterSpacing: "-0.03em", color: "var(--text-primary)", lineHeight: 1.1 }}>
+            {q.name}
+          </div>
+          {q.detail ? <div style={{ marginTop: 4, fontSize: 13, color: "var(--text-muted)" }}>{q.detail}</div> : null}
         </div>
       </div>
     );
@@ -172,10 +106,10 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
       style={{
         background: "var(--surface-page)",
         fontFamily: "var(--font-body)",
-        paddingTop: safe.top + (wide ? 44 : 48),
-        paddingBottom: safe.bottom + 24,
-        paddingLeft: padX,
-        paddingRight: padX,
+        paddingTop: safe.top + (wide ? 28 : 36),
+        paddingBottom: safe.bottom + 18,
+        paddingLeft: wide ? 56 : 40,
+        paddingRight: wide ? 56 : 40,
         opacity: exit,
       }}
     >
@@ -200,7 +134,7 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
             gridTemplateColumns: "1fr 1fr",
             gap: wide ? 28 : 16,
             marginTop: wide ? 18 : 16,
-            justifyItems: "center",
+            justifyItems: "stretch",
           }}
         >
           {portrait(awayQb, inkA, 0.15)}

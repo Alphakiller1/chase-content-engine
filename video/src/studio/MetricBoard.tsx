@@ -1,6 +1,5 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League } from "../teams";
@@ -35,9 +34,8 @@ const catOf = (kind: MetricBoardProps["rankKind"], better: "high" | "low" | null
 };
 
 /**
- * Club vs club the way the live matchup page draws form: values on the outside,
- * a league-percentile bar toward the spine, rank under the number, colour from
- * the metric's category (quality vs rate) against the 32-team pool.
+ * Club vs club the way the live MLB form card draws: values outside, thin
+ * percentile bars to the spine, rank under the number, metric name in the middle.
  */
 export const MetricBoard: React.FC<MetricBoardProps> = ({
   league,
@@ -58,16 +56,18 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const padX = wide ? 64 : 44;
-  const labelW = wide ? 200 : 176;
-  const valueW = wide ? 148 : 140;
+  const padX = wide ? 56 : 40;
+  const valueW = wide ? 118 : 108;
+  const labelW = wide ? 168 : 132;
   const cols = `${valueW}px minmax(0,1fr) ${labelW}px minmax(0,1fr) ${valueW}px`;
-  const avail = height - safe.top - safe.bottom - (wide ? 250 : 360) - mixes.length * (wide ? 110 : 140);
-  const rowH = Math.min(wide ? 84 : 108, Math.max(wide ? 64 : 80, avail / Math.max(rows.length, 1)));
-  const valueSize = Math.min(wide ? 50 : 56, rowH * 0.52);
-  const rankH = wide ? 26 : 28;
+  const chrome = wide ? 168 : 210;
+  const mixH = mixes.length * (wide ? 92 : 120);
+  const avail = height - safe.top - safe.bottom - chrome - mixH;
+  const rowH = Math.min(wide ? 72 : 78, Math.max(wide ? 52 : 58, avail / Math.max(rows.length, 1)));
+  const valueSize = Math.min(wide ? 28 : 30, rowH * 0.42);
+  const barH = Math.max(7, Math.round(rowH * 0.14));
 
-  const pctLen = (s: Side) => (s.rank && s.of ? Math.max(0.1, (s.of - s.rank + 1) / s.of) : 0);
+  const pctLen = (s: Side) => (s.rank && s.of ? Math.max(0.08, (s.of - s.rank + 1) / s.of) : 0);
 
   const valueBlock = (s: Side, align: "left" | "right", at: number, cat: StatCat, invert: boolean) => {
     const tone = toneFromRank(s.rank, s.of, cat, invert);
@@ -85,7 +85,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
         >
           <Count text={s.display} at={at} />
         </div>
-        <div style={{ height: rankH, fontWeight: 800, fontSize: wide ? 20 : 22, color: tone, marginTop: 2, opacity: s.rank ? 1 : 0 }}>
+        <div style={{ marginTop: 3, fontWeight: 800, fontSize: wide ? 12 : 13, color: tone, opacity: s.rank ? 0.95 : 0 }}>
           {s.rank ? ordinal(s.rank) : "—"}
         </div>
       </div>
@@ -98,8 +98,8 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
       style={{
         background: "var(--surface-page)",
         fontFamily: "var(--font-body)",
-        paddingTop: safe.top + (wide ? 40 : 48),
-        paddingBottom: safe.bottom + 20,
+        paddingTop: safe.top + (wide ? 28 : 36),
+        paddingBottom: safe.bottom + 16,
         paddingLeft: padX,
         paddingRight: padX + (wide ? 0 : Math.max(0, safe.right - padX)),
         opacity: exit,
@@ -117,14 +117,15 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
             eyebrow={eyebrow}
             title={title}
             meta={poolLabel}
+            spine="Percentile of the league pool"
             wide={wide}
           />
         </div>
 
-        <div style={{ marginTop: wide ? 16 : 20 }}>
+        <div style={{ marginTop: 4 }}>
           {rows.map((r, i) => {
-            const at = stagger(i, 0.28, 0.07);
-            const grow = progress(frame, fps, at, 0.7, EASE_DRAW);
+            const at = stagger(i, 0.18, 0.05);
+            const grow = progress(frame, fps, at, 0.65, EASE_DRAW);
             const cat = catOf(rankKind, r.better);
             const invert = r.better === "low";
             const bar = (s: Side, left: boolean) => {
@@ -135,7 +136,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
                   <div
                     style={{
                       width: `${pctLen(s) * 100 * grow}%`,
-                      height: Math.max(10, rowH * 0.24),
+                      height: barH,
                       borderRadius: 2,
                       background: known ? tone : "var(--vid-track)",
                     }}
@@ -153,14 +154,24 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
                   columnGap: 10,
                   height: rowH,
                   borderTop: i ? "1px solid var(--border-card)" : undefined,
-                  ...rise(frame, fps, at, 8),
+                  ...rise(frame, fps, at, 6),
                 }}
               >
                 {valueBlock(r.away, "left", at, cat, invert)}
                 {bar(r.away, true)}
-                <Caps size={wide ? 17 : 19} color="var(--text-primary)" style={{ textAlign: "center", lineHeight: 1.2 }}>
+                <div
+                  style={{
+                    textAlign: "center",
+                    fontWeight: 800,
+                    fontSize: wide ? 12 : 13,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--text-muted)",
+                    lineHeight: 1.2,
+                  }}
+                >
                   {r.label}
-                </Caps>
+                </div>
                 {bar(r.home, false)}
                 {valueBlock(r.home, "right", at, cat, invert)}
               </div>
@@ -169,18 +180,18 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
         </div>
 
         {mixes.map((m, mi) => (
-          <div key={m.label} style={{ marginTop: wide ? 18 : 22, ...rise(frame, fps, 0.85 + mi * 0.12) }}>
-            <Caps size={wide ? 16 : 18} color="var(--text-primary)" style={{ marginBottom: 8, letterSpacing: "0.12em" }}>
+          <div key={m.label} style={{ marginTop: wide ? 16 : 18, ...rise(frame, fps, 0.7 + mi * 0.1) }}>
+            <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>
               {m.label}
-            </Caps>
+            </div>
             {(["away", "home"] as const).map((key, si) => {
               const team = key === "away" ? away : home;
               const total = m.segments.reduce((acc, g) => acc + g[key], 0) || 1;
-              const grow = progress(frame, fps, 0.95 + mi * 0.12 + si * 0.08, 0.8, EASE_DRAW);
+              const grow = progress(frame, fps, 0.8 + mi * 0.1 + si * 0.06, 0.7, EASE_DRAW);
               return (
-                <div key={team} style={{ display: "grid", gridTemplateColumns: "56px minmax(0,1fr)", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                  <Caps size={wide ? 14 : 16}>{team}</Caps>
-                  <div style={{ display: "flex", height: wide ? 32 : 36, borderRadius: 3, overflow: "hidden", background: "var(--surface-card)" }}>
+                <div key={team} style={{ display: "grid", gridTemplateColumns: "48px minmax(0,1fr)", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                  <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: "0.08em", color: "var(--text-muted)" }}>{team}</div>
+                  <div style={{ display: "flex", height: wide ? 22 : 24, borderRadius: 3, overflow: "hidden", background: "var(--surface-card)" }}>
                     {m.segments.map((g, gi) => {
                       const share = g[key] / total;
                       return (
@@ -193,13 +204,13 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
                             alignItems: "center",
                             justifyContent: "center",
                             fontWeight: 800,
-                            fontSize: wide ? 16 : 18,
+                            fontSize: 12,
                             color: "#111",
                             overflow: "hidden",
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {share > 0.09 ? `${g.label} ${Math.round(share * 100)}%` : ""}
+                          {share > 0.12 ? `${g.label} ${Math.round(share * 100)}%` : ""}
                         </div>
                       );
                     })}
@@ -211,7 +222,7 @@ export const MetricBoard: React.FC<MetricBoardProps> = ({
         ))}
 
         {note ? (
-          <div style={{ marginTop: wide ? 14 : 18, opacity: progress(frame, fps, 1.1, 0.4) }}>
+          <div style={{ marginTop: wide ? 12 : 14, opacity: progress(frame, fps, 0.95, 0.35) }}>
             <InsightFooter wide={wide}>{note}</InsightFooter>
           </div>
         ) : null}

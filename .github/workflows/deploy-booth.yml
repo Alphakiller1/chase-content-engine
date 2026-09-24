@@ -38,8 +38,8 @@ jobs:
       - name: install video studio
         working-directory: video
         run: npm ci
-      - name: build tonight's Giants at Rams pack
-        run: python -m outputs.video_pack --league nfl --game NYG@LAR --show "Monday Night Football" --tag MNF
+      - name: build Falcons at Packers pack
+        run: python -m outputs.video_pack --league nfl --game ATL@GB --show "Thursday Night Football" --tag TNF
       - name: export static booth
         working-directory: video
         run: node scripts/export-booth.mjs --out booth/site --base /chase-content-engine/

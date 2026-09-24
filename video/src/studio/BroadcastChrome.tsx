@@ -8,38 +8,10 @@ type BroadcastBackdropProps = {
   home: string;
 };
 
-/** Shared show ground: restrained team light, a broadcast grid, and a top rail. */
-export const BroadcastBackdrop: React.FC<BroadcastBackdropProps> = ({ league, away, home }) => {
-  const awayInk = teamAccent(away, league);
-  const homeInk = teamAccent(home, league);
-  return (
-    <div aria-hidden style={{ position: "absolute", inset: 0, overflow: "hidden", pointerEvents: "none" }}>
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: [
-            `radial-gradient(70% 54% at -8% 6%, color-mix(in srgb, ${awayInk} 15%, transparent), transparent 68%)`,
-            `radial-gradient(70% 54% at 108% 6%, color-mix(in srgb, ${homeInk} 15%, transparent), transparent 68%)`,
-            "linear-gradient(180deg, var(--surface-inset), var(--surface-page) 46%)",
-          ].join(","),
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          opacity: 0.16,
-          backgroundImage:
-            "linear-gradient(var(--border-card) 1px, transparent 1px), linear-gradient(90deg, var(--border-card) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          maskImage: "linear-gradient(to bottom, black, transparent 58%)",
-        }}
-      />
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 5, background: "var(--edge-brand)" }} />
-    </div>
-  );
-};
+/** Flat desk ground — the live MLB matchup cards, not a broadcast wash. */
+export const BroadcastBackdrop: React.FC<BroadcastBackdropProps> = () => (
+  <div aria-hidden style={{ position: "absolute", inset: 0, background: "var(--surface-page)", pointerEvents: "none" }} />
+);
 
 type BroadcastHeaderProps = {
   league: League;
@@ -52,9 +24,11 @@ type BroadcastHeaderProps = {
   meta?: string;
   wide: boolean;
   showLogos?: boolean;
+  showTeams?: boolean;
+  spine?: string;
 };
 
-/** One hierarchy for every analysis board: teams frame the editorial question. */
+/** Site card header: title left, meta right, optional club marks on the columns. */
 export const BroadcastHeader: React.FC<BroadcastHeaderProps> = ({
   league,
   away,
@@ -66,30 +40,118 @@ export const BroadcastHeader: React.FC<BroadcastHeaderProps> = ({
   meta,
   wide,
   showLogos = true,
+  showTeams = true,
+  spine,
 }) => {
-  const side = (team: string, name: string | undefined, reverse = false) => (
-    <div style={{ display: "flex", alignItems: "center", flexDirection: reverse ? "row-reverse" : "row", gap: wide ? 12 : 10, minWidth: 0 }}>
-      {showLogos ? <TeamLogo team={team} league={league} size={wide ? 58 : 62} /> : null}
+  const mark = (team: string, name: string | undefined, reverse = false) => (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: reverse ? "flex-end" : "flex-start",
+        flexDirection: reverse ? "row-reverse" : "row",
+        gap: 10,
+        minWidth: 0,
+      }}
+    >
+      {showLogos ? <TeamLogo team={team} league={league} size={wide ? 28 : 32} /> : null}
       <div style={{ minWidth: 0, textAlign: reverse ? "right" : "left" }}>
-        <div style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: wide ? 25 : 28, lineHeight: 1, color: teamAccent(team, league) }}>{team}</div>
-        {name && wide ? (
-          <div style={{ marginTop: 5, fontSize: wide ? 14 : 16, fontWeight: 800, color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {name}
-          </div>
-        ) : null}
+        <div
+          style={{
+            fontFamily: "var(--font-body)",
+            fontWeight: 750,
+            fontSize: wide ? 16 : 17,
+            color: "var(--text-primary)",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {name || team}
+        </div>
+        <div style={{ fontWeight: 800, fontSize: wide ? 12 : 13, letterSpacing: "0.08em", color: teamAccent(team, league) }}>{team}</div>
       </div>
     </div>
   );
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: wide ? "minmax(190px,1fr) minmax(420px,2.2fr) minmax(190px,1fr)" : "150px minmax(0,1fr) 150px", gap: wide ? 24 : 14, alignItems: "center" }}>
-      {side(away, awayName)}
-      <div style={{ textAlign: "center", minWidth: 0 }}>
-        <div style={{ fontWeight: 900, fontSize: wide ? 17 : 19, letterSpacing: "0.13em", textTransform: "uppercase", color: "var(--text-accent)" }}>{eyebrow}</div>
-        <div style={{ marginTop: 5, fontFamily: "var(--font-display)", fontWeight: 900, fontSize: wide ? 54 : 58, letterSpacing: "-0.025em", lineHeight: 0.98, color: "var(--text-primary)" }}>{title}</div>
-        {meta ? <div style={{ marginTop: 9, fontWeight: 750, fontSize: wide ? 16 : 18, color: "var(--text-secondary)" }}>{meta}</div> : null}
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: wide ? 28 : 16 }}>
+        <div style={{ minWidth: 0 }}>
+          {eyebrow ? (
+            <div
+              style={{
+                fontWeight: 800,
+                fontSize: wide ? 12 : 13,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: "var(--text-accent)",
+                marginBottom: 8,
+              }}
+            >
+              {eyebrow}
+            </div>
+          ) : null}
+          <div
+            style={{
+              fontFamily: "var(--font-display)",
+              fontWeight: 800,
+              fontSize: wide ? 36 : 32,
+              letterSpacing: "-0.03em",
+              lineHeight: 1.05,
+              color: "var(--text-primary)",
+            }}
+          >
+            {title}
+          </div>
+        </div>
+        {meta ? (
+          <div
+            style={{
+              flexShrink: 0,
+              maxWidth: wide ? "34%" : "40%",
+              textAlign: "right",
+              fontWeight: 650,
+              fontSize: wide ? 13 : 14,
+              lineHeight: 1.35,
+              color: "var(--text-muted)",
+            }}
+          >
+            {meta}
+          </div>
+        ) : null}
       </div>
-      {side(home, homeName, true)}
+      {showTeams ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: wide ? "minmax(0,1fr) auto minmax(0,1fr)" : "1fr auto 1fr",
+            alignItems: "center",
+            gap: 16,
+            marginTop: wide ? 18 : 16,
+            paddingBottom: 12,
+            borderBottom: "1px solid var(--border-card)",
+          }}
+        >
+          {mark(away, awayName)}
+          <div
+            style={{
+              fontWeight: 800,
+              fontSize: wide ? 11 : 12,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              textAlign: "center",
+              padding: "0 12px",
+            }}
+          >
+            {spine || ""}
+          </div>
+          {mark(home, homeName, true)}
+        </div>
+      ) : (
+        <div style={{ marginTop: 12, borderBottom: "1px solid var(--border-card)" }} />
+      )}
     </div>
   );
 };
@@ -103,11 +165,11 @@ export const BroadcastPanel: React.FC<{
     style={{
       position: "relative",
       overflow: "hidden",
-      background: "linear-gradient(180deg, var(--surface-elevated), var(--surface-card))",
-      border: "1px solid var(--border-hover)",
-      borderRadius: "var(--vid-radius-panel)",
-      boxShadow: "var(--vid-shadow-panel)",
-      ...(accent ? { borderTop: `3px solid ${accent}` } : {}),
+      background: "var(--surface-card)",
+      border: "1px solid var(--border-card)",
+      borderRadius: 10,
+      boxShadow: "var(--elevation-card)",
+      ...(accent ? { borderTop: `2px solid ${accent}` } : {}),
       ...style,
     }}
   >
@@ -119,24 +181,20 @@ export const InsightFooter: React.FC<{
   children: React.ReactNode;
   wide: boolean;
   label?: string;
-}> = ({ children, wide, label = "Broadcast read" }) => (
+}> = ({ children, wide }) => (
   <div
     style={{
-      display: "grid",
-      gridTemplateColumns: "auto minmax(0,1fr)",
-      gap: wide ? 18 : 16,
-      alignItems: "start",
-      padding: wide ? "14px 18px" : "16px 18px",
-      borderRadius: 12,
-      border: "1px solid var(--border-card)",
-      background: "color-mix(in srgb, var(--surface-elevated) 92%, transparent)",
+      marginTop: 4,
+      fontWeight: 650,
+      fontSize: wide ? 13 : 14,
+      lineHeight: 1.4,
+      color: "var(--text-muted)",
     }}
   >
-    <div style={{ padding: "5px 9px", borderRadius: 5, background: "var(--accent)", color: "var(--text-on-accent)", fontWeight: 900, fontSize: wide ? 13 : 15, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</div>
-    <div style={{ color: "var(--text-primary)", fontSize: wide ? 19 : 22, fontWeight: 650, lineHeight: 1.32 }}>{children}</div>
+    {children}
   </div>
 );
 
 export const DataLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span style={{ fontWeight: 850, fontSize: 14, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-secondary)" }}>{children}</span>
+  <span style={{ fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)" }}>{children}</span>
 );

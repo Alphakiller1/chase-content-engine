@@ -716,8 +716,8 @@ def mix_items(a, g: dict) -> list[tuple[str, str, dict]]:
             "league": "nfl", "team": team, "teamName": g.get(f"{side}_name", team),
             "opponent": other, "opponentName": g.get(f"{opp}_name", other),
             "eyebrow": f"{a.tag} · Tendencies",
-            "title": g.get(f"{side}_name", team).split(" ")[-1],
-            "subtitle": "Season to date",
+            "title": g.get(f"{side}_name", team),
+            "subtitle": "Season To Date",
             "columns": {
                 "usage": "Usage", "count": "Snaps", "stat": "EPA",
                 "opp": f"{other} Pass%", "extra": "Success",
@@ -1061,10 +1061,11 @@ def metric_items(a, g: dict) -> list[tuple[str, str, dict]]:
             )
             eyebrow = f"{a.tag} · Team form · {label}"
         else:
-            note = "Opponent-adjusted rates, graded against the 32-team pool (1st = best). Bar length is league percentile."
+            note = "Graded against the 32-team league pool. Bar length is percentile; 1st is best."
             eyebrow = f"{a.tag} · Team form"
         return {**base, "eyebrow": eyebrow, "title": title, "rows": rows, "mixes": [],
-                "rankKind": "quality", "note": note}
+                "rankKind": "quality", "note": note,
+                "poolLabel": "Graded Against The 32-Team League Pool"}
 
     def scheme_board(unit: str, cat: str, title: str, labels: dict[str, str], fmt=_pct, mix=None):
         da, dh = (sa.get(unit) or {}).get(cat) or {}, (sh.get(unit) or {}).get(cat) or {}
@@ -1092,13 +1093,13 @@ def metric_items(a, g: dict) -> list[tuple[str, str, dict]]:
 
     spec_keys = [k for k, _, _, _ in FORM_SPECS]
     boards = {
-        "offense": form_board("Offense, Side by Side",
+        "offense": form_board("Offensive Form And League Context",
                               [k for k in spec_keys if k.startswith("off_") and "rush" not in k]),
-        "defense": form_board("Defense, Side by Side",
+        "defense": form_board("Defensive Form And League Context",
                               [k for k in spec_keys if k.startswith("def_") and "rush" not in k]),
-        "rush-offense": form_board("Rush Offense, Side by Side",
+        "rush-offense": form_board("Rush Offense And League Context",
                                    [k for k in spec_keys if k.startswith("off_rush")]),
-        "rush-defense": form_board("Rush Defense, Side by Side",
+        "rush-defense": form_board("Rush Defense And League Context",
                                    [k for k in spec_keys if k.startswith("def_rush")]),
         "pressure": scheme_board("defense", "pressure", "How They Pressure",
                                  {"blitz_rate": "Blitz rate", "pressure_rate": "Pressure rate",
