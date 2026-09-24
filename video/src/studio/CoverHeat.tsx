@@ -1,11 +1,11 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, TeamLogo, Title } from "../ds/kit";
-import { exitAt } from "../ds/motion";
+import { EASE_DRAW, exitAt, progress, rise } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League } from "../teams";
-import { Count } from "./live";
+import { Count, Fit } from "./live";
 import { ordinal, toneFromEpa, toneFromRank } from "./statColor";
+import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
 type Stat = { value: number | null; display: string; rank: number | null; of: number; vsAvg?: string };
@@ -32,15 +32,22 @@ export type CoverHeatProps = {
   shells: Shell[];
 };
 
-const rankLine = (rank: number | null, of = 32, invert?: boolean, suffix = "NFL") => {
-  if (!rank) return { text: "—", color: "var(--text-muted)" };
-  return { text: `${ordinal(rank)} ${suffix}`, color: toneFromRank(rank, of, "quality", invert) };
-};
+const Cell: React.FC<{ text: string; rank: number | null; tone: string; at: number }> = ({ text, rank, tone, at }) => (
+  <div style={{ textAlign: "right" }}>
+    <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 22, lineHeight: 1, color: tone }}>
+      <Count text={text} at={at} />
+    </div>
+    <div style={{ marginTop: 3, fontWeight: 800, fontSize: 12, color: tone }}>{rank ? ordinal(rank) : "—"}</div>
+  </div>
+);
 
+/** Coverage shells as the pitch-mix table: usage bar, rate + rank, EPA both ways. */
 export const CoverHeat: React.FC<CoverHeatProps> = ({
   league,
   offense,
   defense,
+  offenseName,
+  defenseName,
   eyebrow,
   title,
   note,
@@ -51,116 +58,64 @@ export const CoverHeat: React.FC<CoverHeatProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const cols = wide ? "1.2fr 1.35fr 1.2fr 1.2fr" : "1.15fr 1.2fr 1.1fr 1.1fr";
   const maxMix = Math.max(...shells.map((s) => s.rateValue || 0), 0.01);
+  const cols = "minmax(140px,1.1fr) minmax(180px,1.3fr) 130px 150px";
 
   return (
-    <AbsoluteFill style={{ background: "var(--surface-page)", color: "var(--text-primary)", opacity: exit }}>
-      <div
-        style={{
-          padding: `${safe.top}px ${wide ? 44 : 28}px ${safe.bottom}px`,
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-          <div>
-            <Eyebrow size={wide ? 20 : 22}>{eyebrow}</Eyebrow>
-            <Title size={wide ? 44 : 48} style={{ marginTop: 6 }}>{title}</Title>
-          </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <TeamLogo league={league} team={offense} size={46} />
-            <Caps size={14} color="var(--text-muted)">throws vs</Caps>
-            <TeamLogo league={league} team={defense} size={46} />
-          </div>
+    <AbsoluteFill style={{ background: "var(--surface-page)", fontFamily: "var(--font-body)", opacity: exit, padding: `${safe.top + (wide ? 28 : 36)}px ${wide ? 56 : 40}px ${safe.bottom + 16}px` }}>
+      <BroadcastBackdrop league={league} away={offense} home={defense} />
+      <Fit>
+        <div style={rise(frame, fps, 0)}>
+          <BroadcastHeader
+            league={league}
+            away={offense}
+            home={defense}
+            awayName={offenseName}
+            homeName={defenseName}
+            eyebrow={eyebrow}
+            title={title}
+            meta={`${defense} shell mix, then ${offense} EPA in that look against what ${defense} allows.`}
+            spine="Coverage"
+            wide={wide}
+          />
         </div>
-        <Deck size={wide ? 20 : 21} style={{ marginTop: 8, maxWidth: 1080 }}>
-          Mix is how often {defense} plays the look (1st = most often). Then {offense} EPA/play in that look vs what {defense} allows — rank is 1st best.
-        </Deck>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: cols,
-            gap: 10,
-            marginTop: 16,
-            color: "var(--text-muted)",
-            fontWeight: 800,
-            fontSize: 12,
-            letterSpacing: "0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          <span>Look</span>
-          <span>{defense} mix</span>
-          <span style={{ textAlign: "right" }}>{offense} EPA vs it</span>
-          <span style={{ textAlign: "right" }}>{defense} EPA allowed</span>
+        <div style={{ display: "grid", gridTemplateColumns: cols, columnGap: 14, marginTop: 8, padding: "10px 0", borderBottom: "1px solid var(--border-card)" }}>
+          {["Look", "Usage", `${offense} EPA`, `${defense} allows`].map((h, i) => (
+            <div key={h} style={{ textAlign: i < 2 ? "left" : "right", fontWeight: 800, fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+              {h}
+            </div>
+          ))}
         </div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, marginTop: 4 }}>
-          {shells.map((s, i) => {
-            const mix = rankLine(s.rateRank, 32, false, "most");
-            const off = rankLine(s.off.rank, s.off.of);
-            const def = rankLine(s.opp.rank, s.opp.of, true);
-            const bar = Math.max(0.08, (s.rateValue || 0) / maxMix);
-            return (
-              <div
-                key={s.label}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: cols,
-                  gap: 10,
-                  alignItems: "center",
-                  flex: 1,
-                  borderTop: "1px solid var(--border-subtle)",
-                }}
-              >
-                <div style={{ fontWeight: 800, fontSize: wide ? 28 : 26, lineHeight: 1.1 }}>{s.label}</div>
-                <div>
-                  <div className="num" style={{ fontSize: wide ? 32 : 30, fontWeight: 800, lineHeight: 1 }}>
-                    <Count text={s.rate} at={0.1 + i * 0.04} />
-                  </div>
-                  <div
-                    style={{
-                      height: 6,
-                      borderRadius: 3,
-                      background: "var(--border-subtle)",
-                      marginTop: 6,
-                      maxWidth: 180,
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div style={{ width: `${bar * 100}%`, height: "100%", background: toneFromRank(s.rateRank, 32, "rate") }} />
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: 15, color: toneFromRank(s.rateRank, 32, "rate"), marginTop: 4 }}>
-                    {mix.text}
-                  </div>
+        {shells.map((s, i) => {
+          const at = 0.16 + i * 0.05;
+          const grow = progress(frame, fps, at, 0.55, EASE_DRAW);
+          const mixTone = toneFromRank(s.rateRank, 32, "rate");
+          const bar = Math.max(0.06, (s.rateValue || 0) / maxMix);
+          return (
+            <div key={s.label} style={{ display: "grid", gridTemplateColumns: cols, columnGap: 14, alignItems: "center", minHeight: wide ? 64 : 58, borderBottom: "1px solid var(--border-card)", ...rise(frame, fps, at, 6) }}>
+              <div style={{ fontWeight: 750, fontSize: 18, color: "var(--text-primary)" }}>{s.label}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1, height: 8, borderRadius: 2, background: "var(--vid-track)", overflow: "hidden" }}>
+                  <div style={{ width: `${bar * 100 * grow}%`, height: "100%", background: mixTone }} />
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="num" style={{ fontSize: wide ? 30 : 28, fontWeight: 800, color: toneFromEpa(s.off.value ?? 0) }}>
-                    <Count text={s.off.display} at={0.14 + i * 0.04} />
+                <div style={{ width: 72, textAlign: "right" }}>
+                  <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 20, color: mixTone, lineHeight: 1 }}>
+                    <Count text={s.rate} at={at} />
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: off.color, marginTop: 2 }}>{off.text}</div>
-                  {s.off.vsAvg ? (
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }}>{s.off.vsAvg}</div>
-                  ) : null}
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div className="num" style={{ fontSize: wide ? 30 : 28, fontWeight: 800, color: toneFromEpa(s.opp.value ?? 0, true) }}>
-                    <Count text={s.opp.display} at={0.18 + i * 0.04} />
-                  </div>
-                  <div style={{ fontWeight: 800, fontSize: 16, color: def.color, marginTop: 2 }}>{def.text}</div>
-                  {s.opp.vsAvg ? (
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text-muted)" }}>{s.opp.vsAvg}</div>
-                  ) : null}
+                  <div style={{ marginTop: 3, fontWeight: 800, fontSize: 12, color: mixTone }}>{s.rateRank ? ordinal(s.rateRank) : "—"}</div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              <Cell text={s.off.display} rank={s.off.rank} tone={toneFromEpa(s.off.value ?? 0)} at={at} />
+              <Cell text={s.opp.display} rank={s.opp.rank} tone={toneFromEpa(s.opp.value ?? 0, true)} at={at} />
+            </div>
+          );
+        })}
         {note ? (
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", marginTop: 8 }}>{note}</div>
+          <div style={{ marginTop: 12 }}>
+            <InsightFooter wide={wide}>{note}</InsightFooter>
+          </div>
         ) : null}
-      </div>
+      </Fit>
     </AbsoluteFill>
   );
 };

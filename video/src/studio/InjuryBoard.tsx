@@ -1,6 +1,6 @@
 import React from "react";
 import { AbsoluteFill, Img, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, StatusPill, TeamLogo, Title } from "../ds/kit";
+import { Caps, Deck, StatusPill, TeamLogo } from "../ds/kit";
 import { exitAt, progress, rise, stagger } from "../ds/motion";
 import { useSafe } from "../ds/safe";
 import { League, teamAccent } from "../teams";
@@ -93,15 +93,14 @@ export const InjuryBoard: React.FC<InjuryBoardProps> = ({
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
   const ink = teamAccent(team, league);
-  const padX = wide ? 72 : 48;
   const listed = [...rows].sort(
     (a, b) => impactOf(b) - impactOf(a) || rankOf(a.status) - rankOf(b.status) || a.position.localeCompare(b.position),
   );
-  const face = wide ? 88 : 96;
-  const rowH = face + (wide ? 20 : 24);
-  const avail = height - safe.top - safe.bottom - (wide ? 240 : 280);
+  const face = 40;
+  const rowH = wide ? 56 : 60;
+  const avail = height - safe.top - safe.bottom - (wide ? 150 : 180);
   const shown = listed.slice(0, Math.max(1, Math.floor(avail / rowH)));
-  const cols = `${face + 8}px minmax(140px,auto) 132px max-content minmax(72px,1fr)`;
+  const cols = "44px minmax(180px,1.4fr) 150px 88px minmax(80px,1fr)";
 
   const counts = ORDER.map((k) => ({
     k,
@@ -118,24 +117,20 @@ export const InjuryBoard: React.FC<InjuryBoardProps> = ({
       style={{
         background: "var(--surface-page)",
         fontFamily: "var(--font-body)",
-        paddingTop: safe.top + (wide ? 36 : 40),
-        paddingBottom: safe.bottom + 18,
-        paddingLeft: padX,
-        paddingRight: padX,
+        paddingTop: safe.top + (wide ? 28 : 36),
+        paddingBottom: safe.bottom + 16,
+        paddingLeft: wide ? 56 : 40,
+        paddingRight: wide ? 56 : 40,
         opacity: exit,
       }}
     >
       <Fit min={0.94}>
         <div style={{ display: "flex", alignItems: "center", gap: 16, ...rise(frame, fps, 0) }}>
-          <TeamLogo team={team} league={league} size={wide ? 72 : 80} />
+          <TeamLogo team={team} league={league} size={28} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <Eyebrow size={wide ? 24 : 26}>{eyebrow}</Eyebrow>
-            <div style={{ marginTop: 4 }}>
-              <Title size={wide ? 64 : 70}>{title}</Title>
-            </div>
-            <Caps size={wide ? 16 : 18} color={ink} style={{ marginTop: 6 }}>
-              {teamName} · {listed.length} on the report
-            </Caps>
+            <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-accent)" }}>{eyebrow}</div>
+            <div style={{ marginTop: 4, fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 36 : 32, letterSpacing: "-0.03em", lineHeight: 1.05 }}>{title}</div>
+            <div style={{ marginTop: 6, fontWeight: 700, fontSize: 13, color: ink }}>{teamName} · {listed.length} on the report</div>
           </div>
         </div>
 
@@ -240,9 +235,9 @@ export const InjuryBoard: React.FC<InjuryBoardProps> = ({
                   </Caps>
                   <div
                     style={{
-                      fontFamily: "var(--font-display)",
-                      fontWeight: 800,
-                      fontSize: wide ? 38 : 42,
+                      fontFamily: "var(--font-body)",
+                      fontWeight: 750,
+                      fontSize: 17,
                       color: "var(--text-primary)",
                       lineHeight: 1.1,
                       whiteSpace: "nowrap",
@@ -261,7 +256,7 @@ export const InjuryBoard: React.FC<InjuryBoardProps> = ({
                   </Caps>
                 </div>
                 <StatusPill status={r.status} label={labelOf(r.status)} size={wide ? 20 : 22} />
-                <div style={{ fontWeight: 800, fontSize: wide ? 26 : 28, color: "var(--text-primary)", opacity: r.detail ? 1 : 0.55 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text-primary)", opacity: r.detail ? 1 : 0.55 }}>
                   {r.detail || "—"}
                 </div>
               </div>

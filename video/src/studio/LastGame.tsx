@@ -52,12 +52,12 @@ export const LastGame: React.FC<LastGameProps> = ({
   const ink = teamAccent(team, league);
   const { primary } = teamColors(team, league);
   const resultInk = result === "W" ? "var(--mark-positive)" : result === "L" ? "var(--mark-negative)" : "var(--text-secondary)";
-  const face = wide ? 96 : 120;
+  const face = wide ? 48 : 56;
 
   const header = (
     <div style={{ display: "flex", alignItems: "center", gap: 22, flexShrink: 0 }}>
       <div style={{ transform: `scale(${pop(frame, fps, 0)})` }}>
-        <TeamLogo team={team} league={league} size={wide ? 96 : 112} />
+        <TeamLogo team={team} league={league} size={wide ? 36 : 40} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={rise(frame, fps, 0.05)}>
@@ -66,7 +66,7 @@ export const LastGame: React.FC<LastGameProps> = ({
           </Eyebrow>
         </div>
         <div style={{ marginTop: 4, ...rise(frame, fps, 0.12) }}>
-          <Title size={wide ? 66 : 74}>{title}</Title>
+          <Title size={wide ? 36 : 32}>{title}</Title>
         </div>
       </div>
       <div
@@ -116,7 +116,7 @@ export const LastGame: React.FC<LastGameProps> = ({
             style={{
               fontFamily: "var(--font-display)",
               fontWeight: 800,
-              fontSize: wide ? 44 : 48,
+              fontSize: wide ? 28 : 30,
               lineHeight: 1.05,
               color: toneFromRank(null, 32, cat),
               whiteSpace: "nowrap",
@@ -165,7 +165,7 @@ export const LastGame: React.FC<LastGameProps> = ({
             </div>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 34 : 40, lineHeight: 1.05, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontFamily: "var(--font-body)", fontWeight: 750, fontSize: wide ? 18 : 20, lineHeight: 1.1, color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {p.name}
             </div>
             <Caps size={wide ? 19 : 25} style={{ marginTop: 4 }}>
@@ -196,10 +196,10 @@ export const LastGame: React.FC<LastGameProps> = ({
       style={{
         background: "var(--surface-page)",
         fontFamily: "var(--font-body)",
-        paddingTop: safe.top + (wide ? 40 : 36),
-        paddingBottom: safe.bottom + 26,
-        paddingLeft: wide ? 90 : 44,
-        paddingRight: wide ? 90 : Math.max(44, safe.right),
+        paddingTop: safe.top + (wide ? 28 : 36),
+        paddingBottom: safe.bottom + 20,
+        paddingLeft: wide ? 56 : 44,
+        paddingRight: wide ? 56 : Math.max(44, safe.right),
         opacity: exit,
       }}
     >

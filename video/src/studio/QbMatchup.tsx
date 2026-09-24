@@ -200,7 +200,7 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
                       textAlign: "right",
                       fontFamily: "var(--font-display)",
                       fontWeight: 800,
-                      fontSize: wide ? 38 : 36,
+                      fontSize: wide ? 26 : 24,
                       color: pair.a,
                     }}
                   >
@@ -210,7 +210,7 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
                     <Caps size={wide ? 18 : 20} color="var(--text-primary)" style={{ textAlign: "center", marginBottom: 6 }}>
                       {r.label}
                     </Caps>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, height: wide ? 14 : 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, height: 8 }}>
                       <div style={{ display: "flex", justifyContent: "flex-end" }}>
                         <div
                           style={{
@@ -237,7 +237,7 @@ export const QbMatchup: React.FC<QbMatchupProps> = ({
                     style={{
                       fontFamily: "var(--font-display)",
                       fontWeight: 800,
-                      fontSize: wide ? 38 : 36,
+                      fontSize: wide ? 26 : 24,
                       color: pair.b,
                     }}
                   >

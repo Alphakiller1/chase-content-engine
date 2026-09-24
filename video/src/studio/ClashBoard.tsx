@@ -1,11 +1,11 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, TeamLogo, Title } from "../ds/kit";
-import { exitAt, progress } from "../ds/motion";
+import { exitAt, progress, rise } from "../ds/motion";
 import { useSafe } from "../ds/safe";
-import { League } from "../teams";
-import { Count } from "./live";
+import { League, teamAccent } from "../teams";
+import { Count, Fit } from "./live";
 import { ordinal, toneFromEpa, toneFromRank } from "./statColor";
+import { BroadcastBackdrop, BroadcastHeader, InsightFooter } from "./BroadcastChrome";
 import "../fonts";
 
 type Stat = { value: number | null; display: string; rank: number | null; of: number; vsAvg?: string; label?: string };
@@ -36,31 +36,31 @@ export type ClashBoardProps = {
   lanes: Lane[];
 };
 
-const rankText = (rank: number | null, of = 32) => (rank ? `${ordinal(rank)} of ${of}` : "—");
-
-const Cell: React.FC<{
-  stat: Stat;
-  invert?: boolean;
-  epa?: boolean;
-  align?: "left" | "right";
-}> = ({ stat, invert, epa, align = "left" }) => {
-  const tone = epa
-    ? toneFromEpa(stat.value ?? 0, Boolean(invert))
-    : toneFromRank(stat.rank, stat.of, "quality", invert);
-  return (
-    <div style={{ textAlign: align }}>
-      <div className="num" style={{ fontSize: 36, fontWeight: 800, lineHeight: 1, color: tone }}>
-        {stat.display}
-      </div>
-      <div style={{ fontWeight: 800, fontSize: 18, color: tone, marginTop: 6 }}>{rankText(stat.rank, stat.of)}</div>
+const Num: React.FC<{ text: string; rank: number | null; of: number; tone: string; at: number; align?: "left" | "right" }> = ({
+  text,
+  rank,
+  tone,
+  at,
+  align = "right",
+}) => (
+  <div style={{ textAlign: align }}>
+    <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 26, lineHeight: 1, color: tone }}>
+      <Count text={text} at={at} />
     </div>
-  );
-};
+    <div style={{ marginTop: 3, fontWeight: 800, fontSize: 12, color: tone }}>{rank ? ordinal(rank) : "—"}</div>
+  </div>
+);
 
+/**
+ * When one club has the ball: success rate and yards up top, then a two-column
+ * table of what the offense produces against what the defense allows.
+ */
 export const ClashBoard: React.FC<ClashBoardProps> = ({
   league,
   offense,
   defense,
+  offenseName,
+  defenseName,
   eyebrow,
   title,
   note,
@@ -71,124 +71,78 @@ export const ClashBoard: React.FC<ClashBoardProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const enter = progress(frame, fps, 0.05, 0.4);
+  const offInk = teamAccent(offense, league);
+  const defInk = teamAccent(defense, league);
 
   return (
-    <AbsoluteFill style={{ background: "var(--surface-page)", color: "var(--text-primary)", opacity: exit }}>
-      <div
-        style={{
-          padding: `${safe.top}px ${wide ? 48 : 36}px ${safe.bottom}px`,
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <Eyebrow size={wide ? 22 : 24}>{eyebrow}</Eyebrow>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginTop: 8 }}>
-          <Title size={wide ? 52 : 56}>{title}</Title>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-            <TeamLogo league={league} team={offense} size={52} />
-            <Caps size={16} color="var(--text-muted)">on</Caps>
-            <TeamLogo league={league} team={defense} size={52} />
-          </div>
+    <AbsoluteFill style={{ background: "var(--surface-page)", fontFamily: "var(--font-body)", opacity: exit, padding: `${safe.top + (wide ? 28 : 36)}px ${wide ? 56 : 40}px ${safe.bottom + 16}px` }}>
+      <BroadcastBackdrop league={league} away={offense} home={defense} />
+      <Fit>
+        <div style={rise(frame, fps, 0)}>
+          <BroadcastHeader
+            league={league}
+            away={offense}
+            home={defense}
+            awayName={offenseName}
+            homeName={defenseName}
+            eyebrow={eyebrow}
+            title={title}
+            meta="Success rate is the share of plays on schedule. Rank is 1st best in the 32-team pool."
+            spine={`${offense} has the ball`}
+            wide={wide}
+          />
         </div>
-        <Deck size={wide ? 22 : 24} style={{ marginTop: 10, maxWidth: 980 }}>
-          Success rate is the percent of plays that stay on schedule, with NFL rank. Pass success rate is the same split on throws.
-        </Deck>
-
-        <div
-          style={{
-            display: "flex",
-            flexDirection: wide ? "row" : "column",
-            gap: wide ? 28 : 22,
-            marginTop: 22,
-            flex: 1,
-            minHeight: 0,
-            opacity: enter,
-          }}
-        >
-          {lanes.map((lane) => {
+        <div style={{ display: "grid", gridTemplateColumns: wide ? `repeat(${Math.max(lanes.length, 1)}, minmax(0,1fr))` : "1fr", gap: wide ? 28 : 18, marginTop: 8 }}>
+          {lanes.map((lane, li) => {
             const heroTone = toneFromRank(lane.hero.rank, lane.hero.of);
+            const pct = lane.hero.rank && lane.hero.of ? (lane.hero.of - lane.hero.rank + 1) / lane.hero.of : 0.2;
+            const grow = progress(frame, fps, 0.2 + li * 0.08, 0.6);
+            const rows = [
+              { label: "EPA / play", a: lane.offEpa, b: lane.defEpa, epa: true, invertB: true },
+              { label: lane.contextLabel, a: lane.context, b: lane.contextOpp, epa: false, invertB: true },
+            ];
             return (
-              <div
-                key={lane.id}
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  background: "var(--surface-1)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: 20,
-                  padding: wide ? "28px 28px 24px" : "24px 24px 22px",
-                }}
-              >
-                <Caps size={18} style={{ color: "var(--text-accent)" }}>{lane.title}</Caps>
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginTop: 12 }}>
-                  <div className="num" style={{ fontSize: wide ? 84 : 88, fontWeight: 800, lineHeight: 0.9, color: heroTone }}>
-                    <Count text={lane.hero.display} at={0.12} />
-                  </div>
-                  <div style={{ textAlign: "right", paddingBottom: 8 }}>
-                    <div style={{ fontWeight: 800, fontSize: 28, color: heroTone }}>{rankText(lane.hero.rank, lane.hero.of)}</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, letterSpacing: "0.08em", color: "var(--text-muted)", marginTop: 4 }}>
-                      NFL RANK
+              <div key={lane.id} style={{ minWidth: 0, ...rise(frame, fps, 0.12 + li * 0.08) }}>
+                <div style={{ fontWeight: 800, fontSize: 12, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--text-accent)" }}>{lane.title}</div>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 10 }}>
+                  <div>
+                    <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 48 : 44, lineHeight: 0.95, color: heroTone }}>
+                      <Count text={lane.hero.display} at={0.15 + li * 0.05} />
                     </div>
+                    <div style={{ marginTop: 4, fontWeight: 800, fontSize: 14, color: heroTone }}>{lane.hero.rank ? ordinal(lane.hero.rank) : "—"}</div>
                   </div>
+                  {lane.yards ? (
+                    <div style={{ textAlign: "right" }}>
+                      <div className="num" style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 28, color: "var(--text-primary)" }}>{lane.yards.display}</div>
+                      <div style={{ fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--text-muted)" }}>{lane.yards.label}</div>
+                    </div>
+                  ) : null}
                 </div>
-                {lane.yards ? (
-                  <div
-                    style={{
-                      marginTop: 18,
-                      display: "inline-flex",
-                      alignItems: "baseline",
-                      gap: 12,
-                      alignSelf: "flex-start",
-                      background: "var(--surface-2, #14161c)",
-                      borderRadius: 12,
-                      padding: "12px 16px",
-                    }}
-                  >
-                    <span className="num" style={{ fontSize: 36, fontWeight: 800 }}>{lane.yards.display}</span>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: "var(--text-muted)" }}>{lane.yards.label}</span>
-                  </div>
-                ) : (
-                  <div style={{ height: 18 }} />
-                )}
-
-                <div
-                  style={{
-                    marginTop: 32,
-                    display: "grid",
-                    gridTemplateColumns: "1.05fr 1fr 1fr",
-                    gap: 12,
-                    paddingTop: 8,
-                  }}
-                >
+                <div style={{ marginTop: 10, height: 8, borderRadius: 2, background: "var(--vid-track)", overflow: "hidden" }}>
+                  <div style={{ width: `${pct * 100 * grow}%`, height: "100%", background: heroTone }} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.1fr) 110px 110px", columnGap: 10, marginTop: 16, paddingBottom: 8, borderBottom: "1px solid var(--border-card)" }}>
                   <div />
-                  <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-                    {offense} produces
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-muted)", textAlign: "right" }}>
-                    {defense} allows
-                  </div>
-
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-secondary)", alignSelf: "center" }}>EPA / play</div>
-                  <Cell stat={lane.offEpa} epa />
-                  <Cell stat={lane.defEpa} epa invert align="right" />
-
-                  <div style={{ height: 12, gridColumn: "1 / -1", borderTop: "1px solid var(--border-subtle)" }} />
-
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-secondary)", alignSelf: "center" }}>{lane.contextLabel}</div>
-                  <Cell stat={lane.context} />
-                  <Cell stat={lane.contextOpp} invert align="right" />
+                  <div style={{ textAlign: "right", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: offInk }}>{offense}</div>
+                  <div style={{ textAlign: "right", fontWeight: 800, fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: defInk }}>{defense}</div>
                 </div>
+                {rows.map((r) => (
+                  <div key={r.label} style={{ display: "grid", gridTemplateColumns: "minmax(0,1.1fr) 110px 110px", columnGap: 10, alignItems: "center", minHeight: 58, borderBottom: "1px solid var(--border-card)" }}>
+                    <div style={{ fontWeight: 800, fontSize: 13, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--text-muted)" }}>{r.label}</div>
+                    <Num text={r.a.display} rank={r.a.rank} of={r.a.of} at={0.3} tone={r.epa ? toneFromEpa(r.a.value ?? 0) : toneFromRank(r.a.rank, r.a.of)} />
+                    <Num text={r.b.display} rank={r.b.rank} of={r.b.of} at={0.34} tone={r.epa ? toneFromEpa(r.b.value ?? 0, true) : toneFromRank(r.b.rank, r.b.of, "quality", true)} />
+                  </div>
+                ))}
               </div>
             );
           })}
         </div>
         {note ? (
-          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-muted)", marginTop: 14 }}>{note}</div>
+          <div style={{ marginTop: 14 }}>
+            <InsightFooter wide={wide}>{note}</InsightFooter>
+          </div>
         ) : null}
-      </div>
+      </Fit>
     </AbsoluteFill>
   );
 };

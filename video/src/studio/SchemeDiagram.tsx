@@ -54,7 +54,6 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
   const safe = useSafe("youtube");
   const wide = width > height * 1.2;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
-  const padX = wide ? 80 : 48;
   const draw = progress(frame, fps, 0.35, 1.0, EASE_DRAW);
   const titleBlock = wide ? 140 : 150;
   const clubHead = wide ? 78 : 86;
@@ -65,8 +64,8 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
   const fh = wide
     ? Math.max(260, Math.min(360, room - clubHead - tiles - 24))
     : Math.max(200, Math.min(280, (room - stackGap) / 2 - clubHead - tiles));
-  const dot = wide ? 22 : 24;
-  const roleSize = wide ? 22 : 24;
+  const dot = wide ? 16 : 18;
+  const roleSize = wide ? 13 : 14;
 
   const field = (look: SchemeLook, at: number) => {
     const ink = teamAccent(look.team, league);
@@ -74,7 +73,7 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
     return (
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", ...rise(frame, fps, at, 18) }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 12, minHeight: clubHead }}>
-          <TeamLogo team={look.team} league={league} size={wide ? 64 : 60} />
+          <TeamLogo team={look.team} league={league} size={28} />
           <div style={{ minWidth: 0 }}>
             <Caps size={wide ? 18 : 20} color={ink}>
               {look.team}
@@ -83,7 +82,7 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 800,
-                fontSize: wide ? 36 : 34,
+                fontSize: wide ? 22 : 20,
                 color: "var(--text-primary)",
                 lineHeight: 1.05,
                 whiteSpace: "nowrap",
@@ -109,7 +108,7 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
             borderRadius: 16,
             overflow: "hidden",
             border: "1px solid var(--border-card)",
-            background: `radial-gradient(90% 80% at 50% 100%, color-mix(in srgb, ${ink} 22%, var(--surface-card)), var(--surface-card))`,
+            background: "var(--surface-card)",
             opacity: inP,
           }}
         >
@@ -212,10 +211,10 @@ export const SchemeDiagram: React.FC<SchemeDiagramProps> = ({
       style={{
         background: "var(--surface-page)",
         fontFamily: "var(--font-body)",
-        paddingTop: safe.top + (wide ? 44 : 48),
-        paddingBottom: safe.bottom + 22,
-        paddingLeft: padX,
-        paddingRight: padX,
+        paddingTop: safe.top + (wide ? 28 : 36),
+        paddingBottom: safe.bottom + 18,
+        paddingLeft: wide ? 56 : 40,
+        paddingRight: wide ? 56 : 40,
         opacity: exit,
       }}
     >

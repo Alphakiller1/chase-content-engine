@@ -1,5 +1,5 @@
 import { AbsoluteFill, Interactive, useCurrentFrame, useVideoConfig } from "remotion";
-import { Caps, Deck, Eyebrow, TeamLogo, Title } from "../ds/kit";
+import { Caps, Deck, Eyebrow, TeamLogo } from "../ds/kit";
 import { EASE_DRAW, exitAt, progress, rise } from "../ds/motion";
 import { Platform, useSafe } from "../ds/safe";
 import { League, teamAccent } from "../teams";
@@ -49,10 +49,10 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
   const { fps, width, height, durationInFrames } = useVideoConfig();
   const wide = width > height;
   const safe = useSafe(platform);
-  const pad = wide ? 120 : 64;
+  const pad = wide ? 56 : 44;
   const exit = exitAt(frame, fps, durationInFrames, 0.5);
   const sorted = [...items].sort((a, b) => a.rank - b.rank);
-  const headH = wide ? 190 : 300;
+  const headH = wide ? 88 : 120;
   const rowH = Math.min(
     wide ? 84 : 120,
     (height - safe.top - safe.bottom - headH - (wide ? 150 : 220)) / Math.max(sorted.length, 1),
@@ -63,7 +63,7 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
       name="Rank Countdown"
       style={{
         background: ground ? "var(--surface-page)" : "transparent",
-        paddingTop: safe.top + (wide ? 60 : 80),
+        paddingTop: safe.top + (wide ? 28 : 40),
         paddingBottom: safe.bottom + 40,
         paddingLeft: pad,
         paddingRight: pad + (wide ? 0 : Math.max(0, safe.right - pad)),
@@ -78,7 +78,7 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
         ) : null}
         {title ? (
           <div style={{ marginTop: 10, ...rise(frame, fps, 0.1) }}>
-            <Title size={wide ? 80 : 96}>{title}</Title>
+            <div style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: wide ? 36 : 32, letterSpacing: "-0.03em", lineHeight: 1.05 }}>{title}</div>
           </div>
         ) : null}
       </Interactive.Div>
@@ -134,7 +134,7 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
                   textAlign: "right",
                   fontFamily: "var(--font-display)",
                   fontWeight: 800,
-                  fontSize: rowH * 0.52,
+                  fontSize: Math.min(22, rowH * 0.34),
                   color: it.spotlight ? "var(--text-accent)" : "var(--text-muted)",
                 }}
               >
@@ -142,7 +142,7 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
               </div>
               {it.team && it.league ? (
                 <div style={{ position: "relative" }}>
-                  <TeamLogo team={it.team} league={it.league} size={rowH * 0.62} />
+                  <TeamLogo team={it.team} league={it.league} size={Math.min(28, rowH * 0.45)} />
                 </div>
               ) : null}
               <div style={{ position: "relative", flex: 1, minWidth: 0 }}>
@@ -150,7 +150,7 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
                   style={{
                     fontFamily: "var(--font-display)",
                     fontWeight: 800,
-                    fontSize: rowH * 0.42,
+                    fontSize: Math.min(20, rowH * 0.3),
                     color: "var(--text-primary)",
                     lineHeight: 1.05,
                     whiteSpace: "nowrap",
@@ -172,7 +172,7 @@ export const RankCountdown: React.FC<RankCountdownProps> = ({
                   position: "relative",
                   fontFamily: "var(--font-display)",
                   fontWeight: 800,
-                  fontSize: rowH * 0.46,
+                  fontSize: Math.min(22, rowH * 0.32),
                   color: ink,
                 }}
               >
