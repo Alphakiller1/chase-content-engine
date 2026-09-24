@@ -162,9 +162,9 @@ export function loadPack(packDir) {
     add("qb", "Skill duels", "qb-stress", "QB stress test", "qb-stress",
       item("qb-stress")?.props.note || "Quarterbacks against the coverage and pressure they will see");
     add("qb", "Skill duels", "wr", "WR1s", "wr-matchup",
-      item("wr-matchup")?.props.note || (item("wr-matchup") ? `${item("wr-matchup").props.awayQb?.name} vs ${item("wr-matchup").props.homeQb?.name}` : ""));
+      "Receiver stress: man, zone, blitz and pressure, with what the other defense allows");
     add("qb", "Skill duels", "rb", "RBs", "rb-matchup",
-      item("rb-matchup")?.props.note || (item("rb-matchup") ? `${item("rb-matchup").props.awayQb?.name} vs ${item("rb-matchup").props.homeQb?.name}` : ""));
+      "Run stress: inside, left, right and outside, with what the other defense allows");
     for (const s of ["away", "home"]) {
       const it = item(`injuries-${s}`);
       if (it) {

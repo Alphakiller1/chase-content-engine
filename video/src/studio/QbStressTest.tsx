@@ -48,13 +48,16 @@ export type QbStressTestProps = {
   note: string;
   awaySide: StressSide;
   homeSide: StressSide;
+  valueLabel?: string;
+  edgeOff?: string;
+  edgeDef?: string;
 };
 
-const edgeFor = (row: StressRow) => {
+const edgeFor = (row: StressRow, offLabel: string, defLabel: string) => {
   if (!row.offense.rank || !row.defense.rank) return { label: "No edge", tone: "var(--text-muted)" };
   const gap = row.defense.rank - row.offense.rank;
-  if (gap >= 7) return { label: "QB edge", tone: toneFromRank(row.offense.rank, row.offense.of) };
-  if (gap <= -7) return { label: "DEF edge", tone: toneFromRank(row.defense.rank, row.defense.of) };
+  if (gap >= 7) return { label: offLabel, tone: toneFromRank(row.offense.rank, row.offense.of) };
+  if (gap <= -7) return { label: defLabel, tone: toneFromRank(row.defense.rank, row.defense.of) };
   return { label: "Toss-up", tone: "var(--mark-caution)" };
 };
 
@@ -77,6 +80,9 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
   note,
   awaySide,
   homeSide,
+  valueLabel = "Pass EPA",
+  edgeOff = "QB edge",
+  edgeDef = "DEF edge",
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height, durationInFrames } = useVideoConfig();
@@ -164,14 +170,14 @@ export const QbStressTest: React.FC<QbStressTestProps> = ({
           }}
         >
           <Caps size={wide ? 12 : 14}>Stress look</Caps>
-          <Caps size={wide ? 12 : 14} style={{ textAlign: "right" }}>Pass EPA</Caps>
+          <Caps size={wide ? 12 : 14} style={{ textAlign: "right" }}>{valueLabel}</Caps>
           <Caps size={wide ? 12 : 14} style={{ textAlign: "right" }}>{side.defense} use</Caps>
           <Caps size={wide ? 12 : 14} style={{ textAlign: "right" }}>EPA allowed</Caps>
         </div>
 
         <div style={{ marginTop: 2 }}>
           {side.rows.map((row, rowIndex) => {
-            const edge = edgeFor(row);
+            const edge = edgeFor(row, edgeOff, edgeDef);
             const offTone = toneFromRank(row.offense.rank, row.offense.of);
             const defTone = toneFromRank(row.defense.rank, row.defense.of);
             const freqWidth = Math.max(8, Math.min(100, Number.parseFloat(row.defenseRate.display) || 0));

@@ -254,33 +254,208 @@ def _skill_face(g: dict, team: str, p: dict) -> dict:
     }
 
 
+def _run_direction_rows(season: int, through_week: int) -> dict[str, list[dict]]:
+    """Team rush EPA by direction, and EPA allowed by the defense on those runs.
+
+    nflverse does not chart man versus zone blocking. Inside / left / right /
+    outside are the published run-location and run-gap splits.
+    """
+    from outputs.week_form import load_pbp
+
+    df = load_pbp(season)
+    df = df[(df["season_type"] == "REG") & (df["week"] <= through_week) & df["posteam"].notna()]
+    rush = df[(df["play_type"] == "run") & df["epa"].notna()].copy()
+    if rush.empty or "run_location" not in rush.columns:
+        return {}
+    cuts = (
+        ("Inside", rush["run_location"] == "middle"),
+        ("Left", rush["run_location"] == "left"),
+        ("Right", rush["run_location"] == "right"),
+        ("Outside", rush["run_gap"] == "end") if "run_gap" in rush.columns else ("Outside", rush["run_location"].isin(["left", "right"])),
+    )
+    by_team: dict[str, list[dict]] = {}
+    off_plays = rush.groupby("posteam").size()
+    def_plays = rush.groupby("defteam").size()
+    for label, mask in cuts:
+        sub = rush.loc[mask]
+        if sub.empty:
+            continue
+        off = sub.groupby("posteam")["epa"].mean()
+        de = sub.groupby("defteam")["epa"].mean()
+        off_rank = off.rank(ascending=False, method="min")
+        def_rank = de.rank(ascending=True, method="min")
+        off_share = sub.groupby("posteam").size() / off_plays
+        def_share = sub.groupby("defteam").size() / def_plays
+        off_freq = off_share.rank(ascending=False, method="min")
+        def_freq = def_share.rank(ascending=False, method="min")
+        teams = set(off.index) | set(de.index)
+        for team in teams:
+            code = str(team)
+            by_team.setdefault(code, [])
+            by_team[code].append({
+                "label": label,
+                "off": _epa_stat(None if code not in off.index else float(off[code]), {"mean": float(off.mean()), "std": float(off.std() or 0)}),
+                "offRank": int(off_rank[code]) if code in off_rank.index and pd_notna(off_rank[code]) else None,
+                "def": _epa_stat(None if code not in de.index else float(de[code]), {"mean": float(de.mean()), "std": float(de.std() or 0)}, invert=True),
+                "defRank": int(def_rank[code]) if code in def_rank.index and pd_notna(def_rank[code]) else None,
+                "offShare": float(off_share[code]) if code in off_share.index else None,
+                "offFreq": int(off_freq[code]) if code in off_freq.index and pd_notna(off_freq[code]) else None,
+                "defShare": float(def_share[code]) if code in def_share.index else None,
+                "defFreq": int(def_freq[code]) if code in def_freq.index and pd_notna(def_freq[code]) else None,
+            })
+    return by_team
+
+
+def pd_notna(v) -> bool:
+    try:
+        return v == v and v is not None
+    except Exception:
+        return False
+
+
+def _lookup_run(table: dict[str, list[dict]], code: str) -> list[dict]:
+    for key in club_keys(code):
+        if key in table:
+            return table[key]
+    return []
+
+
 def skill_duel_items(a, g: dict) -> list[tuple[str, str, dict]]:
-    """WR1 vs WR1 and RB1 vs RB1: same board as the QB duel, with this season's starts."""
+    """WR1 and RB1 on the quarterback stress board.
+
+    Receivers: team pass EPA against man, zone, blitz and pressure, next to what
+    the other defense allows in that look. Backs: inside, left, right and outside
+    rush EPA, next to what the other defense allows on those runs.
+    """
     from outputs.season_starts import duel_card
+
     away, home = g["away"].upper(), g["home"].upper()
+    window = g.get("form_window") or {}
+    season = int(window.get("season") or 2026)
+    through = int(window.get("through_week") or 1)
+    try:
+        run_table = _run_direction_rows(season, max(1, through))
+    except Exception as exc:
+        print(f"[video-studio] run splits unavailable: {exc}")
+        run_table = {}
+
+    def player(pos: str, side: str) -> dict | None:
+        return next((p for p in (g.get(f"{side}_players") or [])
+                     if p.get("position") == pos and p.get("depth_rank") == 1), None)
+
+    def pass_rows(off_side: str, def_side: str) -> list[dict]:
+        off_s = g.get(f"{off_side}_scheme") or {}
+        def_s = g.get(f"{def_side}_scheme") or {}
+        off_r = _scheme_unit(off_s, "offense", "response")
+        def_r = _scheme_unit(def_s, "defense", "response")
+        off_lg = (off_s.get("league_response") or {}).get("offense") or {}
+        def_lg = (def_s.get("league_response") or {}).get("defense") or {}
+        def_c = _scheme_unit(def_s, "defense", "coverage")
+        def_p = _scheme_unit(def_s, "defense", "pressure")
+        specs = (
+            ("Man coverage", "man", def_c.get("man_rate"), "coverage", "man_rate"),
+            ("Zone coverage", "zone", def_c.get("zone_rate"), "coverage", "zone_rate"),
+            ("Blitz", "blitz", def_p.get("blitz_rate"), "pressure", "blitz_rate"),
+            ("Pressure", "pressure", def_p.get("pressure_rate"), "pressure", "pressure_rate"),
+        )
+        rows = []
+        for label, split, rate, rate_cat, rate_key in specs:
+            epa_key = f"pass_epa_{split}"
+            rows.append({
+                "label": label,
+                "offense": _epa_stat(off_r.get(epa_key), off_lg.get(epa_key)),
+                "defenseRate": {
+                    "display": _pct(float(rate)) if rate is not None else "—",
+                    "rank": _freq_rank(def_s, "defense", rate_cat, rate_key),
+                },
+                "defense": _epa_stat(def_r.get(epa_key), def_lg.get(epa_key), invert=True),
+            })
+        return [r for r in rows if r["offense"]["value"] is not None or r["defense"]["value"] is not None]
+
+    def rush_rows(off_side: str, def_side: str) -> list[dict]:
+        off_team = g[off_side].upper()
+        def_team = g[def_side].upper()
+        off_cuts = {r["label"]: r for r in _lookup_run(run_table, off_team)}
+        def_cuts = {r["label"]: r for r in _lookup_run(run_table, def_team)}
+        rows = []
+        for label in ("Inside", "Left", "Right", "Outside"):
+            o, d = off_cuts.get(label), def_cuts.get(label)
+            if not o and not d:
+                continue
+            offense = dict(o["off"]) if o else _cell(None)
+            defense = dict(d["def"]) if d else _cell(None)
+            if o and o.get("offRank"):
+                offense["rank"] = o["offRank"]
+            if d and d.get("defRank"):
+                defense["rank"] = d["defRank"]
+            share = d.get("defShare") if d else None
+            rows.append({
+                "label": label,
+                "offense": offense,
+                "defenseRate": {
+                    "display": _pct(share) if share is not None else "—",
+                    "rank": d.get("defFreq") if d else None,
+                },
+                "defense": defense,
+            })
+        return rows
+
     items = []
-    for pos, key, label in (("WR", "wr-matchup", "Wideouts"), ("RB", "rb-matchup", "Running backs")):
-        pa = next((p for p in (g.get("away_players") or [])
-                   if p.get("position") == pos and p.get("depth_rank") == 1), None)
-        ph = next((p for p in (g.get("home_players") or [])
-                   if p.get("position") == pos and p.get("depth_rank") == 1), None)
+    specs = (
+        ("WR", "wr-matchup", "Wideouts", "Receiver Stress Test", "Pass EPA", "WR edge",
+         "Team pass EPA against the coverage and pressure the other defense actually plays. The WR1 is the face; the rates are the club's."),
+        ("RB", "rb-matchup", "Running backs", "Run Scheme Stress Test", "Rush EPA", "RB edge",
+         "Inside, left, right and outside are run location and gap, not a guessed blocking scheme. EPA allowed is what that defense gives up on those runs."),
+    )
+    for pos, key, label, title, value_label, edge, blurb in specs:
+        pa, ph = player(pos, "away"), player(pos, "home")
         if not pa or not ph:
             continue
         card = duel_card(pa["name"], away, ph["name"], home, pos)
-        if not card["starts"] and not card["rows"]:
+        if pos == "WR":
+            away_rows, home_rows = pass_rows("away", "home"), pass_rows("home", "away")
+        else:
+            away_rows, home_rows = rush_rows("away", "home"), rush_rows("home", "away")
+        if len(away_rows) < 2 or len(home_rows) < 2:
             continue
-        gp = card["games"]
-        items.append((key, "QbMatchup", {
+        note = blurb
+        if card.get("games"):
+            note = f"{card['games']} start{'s' if card['games'] != 1 else ''} this season. " + note
+        items.append((key, "QbStressTest", {
             "league": "nfl", "away": away, "home": home,
+            "awayName": g.get("away_name", away), "homeName": g.get("home_name", home),
             "eyebrow": f"{a.tag} · {label}",
-            "title": f"{pa['name'].split(' ')[-1]} vs {ph['name'].split(' ')[-1]}",
-            "awayQb": _skill_face(g, away, pa),
-            "homeQb": _skill_face(g, home, ph),
-            "rows": card["rows"],
-            "starts": card["starts"],
-            "note": f"{gp or 0} start{'s' if gp != 1 else ''} this season and the aggregate.",
+            "title": title,
+            "valueLabel": value_label,
+            "edgeOff": edge,
+            "edgeDef": "DEF edge",
+            "note": note,
+            "awaySide": {
+                "quarterback": _skill_face(g, away, pa),
+                "defense": home,
+                "defenseName": g.get("home_name", home),
+                "projection": _side_projection(card, pos, "away"),
+                "rows": away_rows,
+            },
+            "homeSide": {
+                "quarterback": _skill_face(g, home, ph),
+                "defense": away,
+                "defenseName": g.get("away_name", away),
+                "projection": _side_projection(card, pos, "home"),
+                "rows": home_rows,
+            },
         }))
     return items
+
+
+def _side_projection(card: dict, pos: str, side: str) -> str:
+    key = "awayDisplay" if side == "away" else "homeDisplay"
+    want = "Rec yds" if pos == "WR" else "Rush yds"
+    for row in card.get("rows") or []:
+        if row.get("label") == want and row.get(key):
+            unit = "rec yds" if pos == "WR" else "rush yds"
+            return f"Season · {row[key]} {unit}"
+    return ""
 
 
 def scheme_diagram_items(a, g: dict) -> list[tuple[str, str, dict]]:
