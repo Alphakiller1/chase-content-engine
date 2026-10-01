@@ -38,8 +38,12 @@ jobs:
       - name: install video studio
         working-directory: video
         run: npm ci
-      - name: build Falcons at Packers pack
-        run: python -m outputs.video_pack --league nfl --game ATL@GB --show "Thursday Night Football" --tag TNF
+      # Every game on the live NFL slate (one that fails is skipped): a fixed game
+      # broke the deploy as soon as it left the slate.
+      - name: build the slate's packs
+        run: python -m outputs.video_pack --league nfl --all
+      - name: check a pack was built
+        run: ls video/props/pack/*/pack.json
       - name: export static booth
         working-directory: video
         run: node scripts/export-booth.mjs --out booth/site --base /chase-content-engine/
