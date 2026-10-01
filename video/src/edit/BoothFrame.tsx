@@ -9,7 +9,7 @@ import { Header, Stage } from "./Episode";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const OVERLAYS: Record<string, React.FC<any>> = { CornerBug, LowerThird, Ticker };
-import { LayoutMode, StageSize, bugShift, frameGeom } from "./frames";
+import { LayoutMode, SiteView, StageSize, bugShift, frameGeom, siteSplit } from "./frames";
 import "../fonts";
 
 export type BoothFrameProps = {
@@ -26,6 +26,8 @@ export type BoothFrameProps = {
   size?: StageSize;
   /** Small graphics laid over the stage right now. */
   overlays?: { name: string; props: Record<string, unknown> }[];
+  /** chase-analytics.com on the stage (the booth draws the pages; this makes room for them). */
+  site?: SiteView;
   /** The graphic on the stage right now. */
   graphic: { key: string; label: string; composition: string; props: Record<string, unknown> } | null;
 };
@@ -49,15 +51,17 @@ export const BoothFrame: React.FC<BoothFrameProps> = ({
   captionHint = "Your words appear here",
   size = "full",
   overlays = [],
+  site = "off",
 }) => {
   const G = frameGeom(format, platform, mode, camSize, size);
+  const stage = siteSplit(G, site, format).graphic;
   return (
     // Transparent: the booth paints the page ground under this player and the live
     // camera pip over it, so graphics never cover the bubble.
     <AbsoluteFill style={{ background: "transparent", fontFamily: "var(--font-body)" }}>
-      {graphic ? (
+      {graphic && stage ? (
         <Stage
-          box={G.stage}
+          box={stage}
           insets={G.insets}
           offset={0}
           segments={[{ id: graphic.key, label: graphic.label, composition: graphic.composition, props: graphic.props, from: 0, to: 3600 }]}

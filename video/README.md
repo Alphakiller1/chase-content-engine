@@ -109,6 +109,9 @@ is recorded and replayed in the edit.
 | **A S D F** | Layout: **bubble** (content-first, small round camera), **split** (camera beside or above the content), **graphic only**, **camera only**. The camera window animates between them. |
 | **Click a face** | On a formation, spotlights that player: the others dim and a detail card opens. **Esc** clears it. |
 | **Drag on the picture** | Draw (**P** turns drawing off). **T** changes the colour, **X** toggles the arrow tip, **C** clears. Drawings also clear when the graphic changes. |
+| **G W E Q** | Stage: **graphic**, a chase-analytics.com **site** page, **graphic + site** side by side, or **two pages** side by side. The same key again goes back to the graphic. |
+| **, .** | Previous or next site tab on the stage |
+| **O** | Off-air reference: chase-analytics.com in a panel only you see |
 | **M** | Mark a moment. Marks appear in the plan, not in the video. |
 | **U / Ctrl+Z** | Undo the last action |
 | **?** | Shortcut help |
@@ -123,6 +126,42 @@ is recorded and replayed in the edit.
   `.draw.json` (your drawings).
 - **Drawings and formats:** a drawing is placed over the preview you drew it on, so it
   appears only in that format's video.
+
+### chase-analytics.com in the booth (site tabs)
+
+The panel's **chase-analytics.com on the stage** section holds site tabs: type a page
+(`nfl`, `/mlb/matchup?game=...` or any chase-analytics.com link) or use Home, NFL, MLB,
+CFB and Models. **+** opens another tab on the same page, so you can send it somewhere
+else and compare. Each tab keeps its place while you flip between tabs with **, .** or a
+click.
+
+- **On the stage (in the video):** **W** puts the tab on the stage. **E** shows it beside
+  the graphic: side by side in wide, stacked in vertical, with the graphic at its normal
+  layout, scaled into its half. **Q** shows two tabs together (**⇄ Swap** flips the sides).
+  **G** goes back to the graphic. A page stays clear of the strip the apps cover in
+  vertical. **Page width** sets how wide the site lays itself out for each view (narrower
+  means bigger type).
+- **Off air (only you):** **O** opens a reference panel beside the program frame with
+  any tab in it, to check a number or line up the next page. It is never recorded, in
+  either booth. **On air** puts the page you are looking at on the stage.
+- **Using a page:** with drawing on (**P**), a drag draws over the page. Turn drawing off
+  to click and scroll it. A click into a page takes the keys with it; the yellow banner
+  gives them back to the booth.
+- **How it is recorded:** with any site tab open, **R** first asks to share this tab:
+  pick it. The booth then records the on-air pages as their own track,
+  `footage/<take>.site.webm`, without the camera, drawings or graphics over them.
+  `<take>.site.json` holds where the pages sat, and the cue sheet gets
+  `site full|compare|pair|off <page>` lines. **Make my video** cuts the track into the
+  stage at those moments, in sync with what you said (pauses and redos are cut the same
+  way). Both formats are made from it, and the format you did not preview shows the page
+  fitted into its box. The hosted booth records the program frame, so its takes include
+  the pages directly.
+- **Sharpness:** the track is recorded at the size the program frame has on your screen,
+  so maximise the booth window (or use F11) before recording.
+- **Limits:** the booth sees the page you opened, not where you clicked to inside it,
+  so tab names and cue lines show the opened page. Chrome or Edge is needed to record
+  pages. If you stop sharing mid-take, pages after that point are left out and the
+  graphic stays up.
 
 ### Platforms, small graphics and size
 

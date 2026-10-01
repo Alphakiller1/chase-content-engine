@@ -195,3 +195,59 @@ export const bugShift = (format: "vertical" | "wide", platform: Platform, mode: 
   const g = frameGeom(format, platform, mode, 0);
   return Math.max(0, g.height - g.insets.bottom - 150 - 96);
 };
+
+/**
+ * chase-analytics.com pages on the stage (the booth's Site tabs; the edit replays them
+ * from the recorded site track).
+ *
+ *   off      the graphic alone (the default)
+ *   full     a site page fills the stage
+ *   compare  the graphic and a site page side by side (wide) or stacked (vertical)
+ *   pair     two site pages side by side / stacked
+ */
+export type SiteView = "off" | "full" | "compare" | "pair";
+export const SITE_VIEWS: SiteView[] = ["off", "full", "compare", "pair"];
+
+/**
+ * Where the graphic and the site page(s) sit for a view, in FRAME pixels. A site page
+ * keeps clear of the platform's bottom reserve (and the vertical caption band); next
+ * to a site page the graphic keeps its own layout and is scaled down to fit its half.
+ */
+export function siteSplit(
+  g: FrameGeom,
+  view: SiteView,
+  format: "vertical" | "wide",
+): { graphic: FrameGeom["stage"] | null; sites: Box[] } {
+  const st = g.stage;
+  if (view === "off" || !st.visible) return { graphic: st, sites: [] };
+  const area: Box =
+    format === "wide"
+      ? { x: st.x + 24, y: st.y + 24, w: st.w - 48, h: st.h - 48 }
+      : { x: 40, y: st.y + 16, w: g.width - 80, h: st.h - 32 - g.insets.bottom * st.scale };
+  if (view === "full") return { graphic: null, sites: [area] };
+  const gap = 24;
+  const halves: [Box, Box] =
+    format === "wide"
+      ? [
+          { x: area.x, y: area.y, w: (area.w - gap) / 2, h: area.h },
+          { x: area.x + (area.w + gap) / 2, y: area.y, w: (area.w - gap) / 2, h: area.h },
+        ]
+      : [
+          { x: area.x, y: area.y, w: area.w, h: (area.h - gap) / 2 },
+          { x: area.x, y: area.y + (area.h + gap) / 2, w: area.w, h: (area.h - gap) / 2 },
+        ];
+  if (view === "pair") return { graphic: null, sites: halves };
+  // The graphic lays itself out for the whole stage, then shrinks into its half.
+  const vw = st.w / st.scale;
+  const vh = st.h / st.scale;
+  const k = Math.min(halves[0].w / vw, halves[0].h / vh);
+  const graphic = {
+    x: halves[0].x + (halves[0].w - vw * k) / 2,
+    y: halves[0].y + (halves[0].h - vh * k) / 2,
+    w: vw * k,
+    h: vh * k,
+    scale: k,
+    visible: true,
+  };
+  return { graphic, sites: [halves[1]] };
+}
