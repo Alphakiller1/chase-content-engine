@@ -10,6 +10,8 @@
  *   0:11.3   draw     4                telestration stroke 4 (kept in <name>.draw.json)
  *   0:14.0   clear                    wipe the drawings
  *   0:20.0   mark     great answer     a note for yourself; not shown
+ *   0:24.0   site     full /nfl/       a chase-analytics.com page on the stage (from the
+ *                                     take's site track): full | compare | pair | off
  *
  * Times are in the ORIGINAL recording (what a video player shows for the raw file),
  * so a sheet stays right however the pauses are cut. Lines starting with # are
@@ -18,7 +20,8 @@
  */
 import { LAYOUT_MODES_JS, OVERLAYS_JS, STAGE_SIZES_JS } from "./layouts.mjs";
 
-export const COMMANDS = ["layout", "size", "overlay", "focus", "draw", "clear", "mark"];
+export const COMMANDS = ["layout", "size", "overlay", "focus", "draw", "clear", "mark", "site"];
+export const SITE_VIEWS_JS = ["off", "full", "compare", "pair"];
 
 export const parseTime = (s) => {
   const parts = s.split(":").map(Number);
@@ -57,11 +60,19 @@ export function parseCueSheet(text, validKeys, strokeIds = null) {
           return errors.push(`line ${i + 1}: overlay takes ${Object.keys(OVERLAYS_JS).join(" | ")} and on | off`);
         }
       }
+      if (word === "site" && !SITE_VIEWS_JS.includes(arg.split(/\s+/)[0].toLowerCase())) {
+        return errors.push(`line ${i + 1}: site must start with ${SITE_VIEWS_JS.join(" | ")} (then the page, e.g. site full /nfl/)`);
+      }
       if (word === "focus" && !arg) return errors.push(`line ${i + 1}: focus needs a player name (or - to clear)`);
       if (word === "draw" && (!/^\d+$/.test(arg) || (strokeIds && !strokeIds.has(Number(arg))))) {
         return errors.push(`line ${i + 1}: draw needs a stroke number from the .draw.json file`);
       }
-      cues.push({ t, cmd: word, arg: ["layout", "size", "overlay"].includes(word) ? arg.toLowerCase() : arg });
+      const tidy = ["layout", "size", "overlay"].includes(word)
+        ? arg.toLowerCase()
+        : word === "site"
+          ? arg.replace(/^\S+/, (v) => v.toLowerCase())
+          : arg;
+      cues.push({ t, cmd: word, arg: tidy });
       return;
     }
     if (!validKeys.includes(word)) return errors.push(`line ${i + 1}: unknown graphic "${word}"`);
@@ -92,6 +103,8 @@ export function formatCueSheet(cues, catalog, header) {
     "#   focus   <player name>  (on a formation; focus - clears)",
     "#   draw    <stroke number> / clear",
     "#   mark    <note>         (not shown)",
+    "#   site    full | compare | pair | off, then the page  (chase-analytics.com on the stage,",
+    "#           replayed from the take's site track; compare = graphic + page, pair = two pages)",
     "#",
     "# Graphics you can use:",
     ...catalog.map((c) => `#   ${c.key.padEnd(width + 2)}${c.groupLabel ? `${c.groupLabel} · ` : ""}${c.label}`),

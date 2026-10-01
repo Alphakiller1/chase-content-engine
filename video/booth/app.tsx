@@ -11,7 +11,7 @@ import { Player, PlayerRef } from "@remotion/player";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BoothFrame, BoothFrameProps } from "../src/edit/BoothFrame";
-import { LAYOUT_MODES, LayoutMode, StageSize, Stroke, frameGeom } from "../src/edit/frames";
+import { Box, LAYOUT_MODES, LayoutMode, SITE_VIEWS, SiteView, StageSize, Stroke, frameGeom, siteSplit } from "../src/edit/frames";
 import { teamAccent } from "../src/teams";
 import "../src/theme.css";
 import "./booth.css";
@@ -76,6 +76,54 @@ const OVERLAYS = { bug: "CornerBug", name: "LowerThird", ticker: "Ticker" } as c
 type OverlayKey = keyof typeof OVERLAYS;
 const OVERLAY_LABEL: Record<OverlayKey, string> = { bug: "Matchup bug", name: "Name strap", ticker: "Line ticker" };
 const OVERLAY_KEYS: Record<string, OverlayKey> = { b: "bug", n: "name", k: "ticker" };
+/* chase-analytics.com in the booth: tabs that go on the stage (recorded) or sit in the
+   off-air reference panel (only you see it). */
+const SITE_ORIGIN = "https://chase-analytics.com";
+const SITE_LINKS: [string, string][] = [
+  ["Home", "/"],
+  ["NFL", "/nfl/"],
+  ["MLB", "/mlb/"],
+  ["CFB", "/cfb/"],
+  ["Models", "/model-center/"],
+];
+const MAX_SITE_TABS = 8;
+const SITE_KEYS: Record<string, SiteView> = { g: "off", w: "full", e: "compare", q: "pair" };
+const SITE_LABEL: Record<SiteView, string> = { off: "Graphic", full: "Site", compare: "Graphic + site", pair: "Two pages" };
+/** The width the site lays itself out at (narrower = bigger type on the stage). */
+const SITE_WIDTH: Record<"vertical" | "wide", Record<Exclude<SiteView, "off">, number>> = {
+  wide: { full: 1280, compare: 960, pair: 960 },
+  vertical: { full: 430, compare: 430, pair: 430 },
+};
+type SiteTab = { id: number; path: string; rev: number };
+/** A page path on chase-analytics.com from whatever was typed, or null for another site. */
+const sitePath = (input: string): string | null => {
+  const raw = input.trim();
+  if (!raw) return "/";
+  // A bare section name ("nfl") is that section's page.
+  if (/^[\w-]+$/.test(raw)) return `/${raw.toLowerCase()}/`;
+  try {
+    const u = new URL(/^[a-z]+:\/\//i.test(raw) ? raw : /^[\w-]+(\.[\w-]+)+(\/|$)/.test(raw) ? `https://${raw}` : `${SITE_ORIGIN}/${raw.replace(/^\/+/, "")}`);
+    if (!/(^|\.)chase-analytics\.com$/i.test(u.hostname)) return null;
+    return `${u.pathname}${u.search}${u.hash}` || "/";
+  } catch {
+    return null;
+  }
+};
+const siteUrl = (path: string) => `${SITE_ORIGIN}${path}`;
+const loadSiteTabs = (): { tabs: SiteTab[]; air: number; ref: number } => {
+  try {
+    const saved = JSON.parse(readPref("booth.siteTabs", "{}")) as { tabs?: unknown; air?: unknown; ref?: unknown };
+    const paths = (Array.isArray(saved.tabs) ? saved.tabs : []).map((x) => sitePath(String(x))).filter((x): x is string => !!x);
+    const tabs = paths.slice(0, MAX_SITE_TABS).map((path, i) => ({ id: i + 1, path, rev: 0 }));
+    const pick = (i: unknown) => tabs[Number.isInteger(i) ? (i as number) : 0]?.id ?? tabs[0]?.id ?? 0;
+    return { tabs, air: pick(saved.air), ref: pick(saved.ref) };
+  } catch {
+    return { tabs: [], air: 0, ref: 0 };
+  }
+};
+const sameBoxes = (a: Box[], b: Box[]) =>
+  a.length === b.length && a.every((x, i) => ["x", "y", "w", "h"].every((k) => Math.abs(x[k as keyof Box] - b[i][k as keyof Box]) < 0.5));
+
 /** Mirrors src/ds/safe.ts: the band each app paints over the bottom of a vertical video. */
 const SAFE_BOTTOM = { reels: 440, tiktok: 420, shorts: 400 } as const;
 const FPS = 30;
@@ -158,7 +206,14 @@ const cueLabel = (c: Cue, byKey: Map<string, Entry>) =>
               ? `Drawing #${c.arg}`
               : c.cmd === "clear"
                 ? "Clear drawings"
-                : `★ ${c.arg}`;
+                : c.cmd === "site"
+                  ? siteCueLabel(String(c.arg))
+                  : `★ ${c.arg}`;
+const siteCueLabel = (arg: string) => {
+  const [view, ...rest] = arg.split(/\s+/);
+  const pages = rest.join(" ").split(SITE_ORIGIN).join("");
+  return view === "off" ? "Site off · graphic" : `${SITE_LABEL[view as SiteView] ?? view} · ${pages}`;
+};
 
 /* ── app ──────────────────────────────────────────────────────────────────── */
 
@@ -213,6 +268,37 @@ const App: React.FC = () => {
   const [size, setSize] = useState<StageSize>("full");
   const [overlaysOn, setOverlaysOn] = useState<OverlayKey[]>([]);
   const [showZones, setShowZones] = useState(() => readPref("booth.zones", "1") === "1");
+
+  /* site tabs */
+  const savedSite = useMemo(loadSiteTabs, []);
+  const [siteTabs, setSiteTabs] = useState<SiteTab[]>(savedSite.tabs);
+  const [airId, setAirId] = useState(savedSite.air); // the page on the stage (in Two pages: the right / bottom one)
+  const [pairId, setPairId] = useState(0); // Two pages: the left / top one
+  const [siteView, setSiteView] = useState<SiteView>("off");
+  const [refOpen, setRefOpen] = useState(() => readPref("booth.ref", "0") === "1");
+  const [refId, setRefId] = useState(savedSite.ref);
+  const [siteAddr, setSiteAddr] = useState("");
+  const [siteWidths, setSiteWidths] = useState<Record<string, number>>(() => {
+    try {
+      return JSON.parse(readPref("booth.siteWidths", "{}"));
+    } catch {
+      return {};
+    }
+  });
+  // Tabs get an iframe the first time they are shown (on the stage or in the reference), then keep it.
+  const [airMounted, setAirMounted] = useState<number[]>([]);
+  const [refMounted, setRefMounted] = useState<number[]>([]);
+  const nextTabId = useRef(Math.max(0, ...savedSite.tabs.map((t) => t.id)) + 1);
+  const siteLayerRef = useRef<HTMLDivElement>(null);
+  /* The take's site track (local booth): the on-air pages, recorded on their own. */
+  const siteRec = useRef<{
+    stream: MediaStream;
+    rec: MediaRecorder | null;
+    chunks: Blob[];
+    mime: string;
+    start: number;
+    boxes: { t: number; view: SiteView; boxes: Box[] }[];
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const phoneAudioRef = useRef<HTMLAudioElement>(null);
@@ -708,6 +794,280 @@ const App: React.FC = () => {
     say(`Marked #${n}`);
   }, [pushCue, say]);
 
+  /* ── site tabs ── */
+
+  const tabById = useCallback((id: number) => siteTabs.find((t) => t.id === id) ?? null, [siteTabs]);
+  const prevAir = useRef(0);
+  const siteArg = (view: SiteView, air: SiteTab | null, pair: SiteTab | null) =>
+    view === "off" || !air
+      ? "off"
+      : view === "pair"
+        ? `pair ${siteUrl(pair?.path ?? air.path)} | ${siteUrl(air.path)}`
+        : `${view} ${siteUrl(air.path)}`;
+  /** A new tab (not yet on the stage); null when there are already as many as fit. */
+  const makeTab = useCallback(
+    (path: string): SiteTab | null => {
+      if (siteTabs.length >= MAX_SITE_TABS) {
+        say(`${MAX_SITE_TABS} site tabs at most - close one first`);
+        return null;
+      }
+      const tab = { id: nextTabId.current++, path, rev: 0 };
+      setSiteTabs((ts) => [...ts, tab]);
+      return tab;
+    },
+    [say, siteTabs.length],
+  );
+
+  /** Tab-capture of the site layer only: the on-air pages, without the camera, ink or graphics over them. */
+  const startSiteCapture = useCallback(async (): Promise<boolean> => {
+    if (STATIC) return true; // the hosted booth records the whole program frame already
+    if (siteRec.current) return true;
+    const layer = siteLayerRef.current;
+    const w = window as unknown as {
+      RestrictionTarget?: { fromElement: (el: Element) => Promise<unknown> };
+      CropTarget?: { fromElement: (el: Element) => Promise<unknown> };
+    };
+    if (!layer) return false;
+    if (!w.RestrictionTarget && !w.CropTarget) {
+      say("Recording site pages needs Chrome or Edge");
+      return false;
+    }
+    // Sized so the frame's long side comes out near 1920 (the size the edit renders at).
+    const r = layer.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const k = Math.min(2 * dpr, Math.max(dpr, 1920 / Math.max(1, r.width, r.height)));
+    let stream: MediaStream;
+    try {
+      say("Share this tab - it records the site pages for the video");
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: "browser",
+          frameRate: { ideal: 30, max: 30 },
+          width: { ideal: Math.round(window.innerWidth * k) },
+          height: { ideal: Math.round(window.innerHeight * k) },
+        },
+        audio: false,
+        preferCurrentTab: true,
+        selfBrowserSurface: "include",
+        surfaceSwitching: "exclude",
+        monitorTypeSurfaces: "exclude",
+      } as DisplayMediaStreamOptions);
+    } catch {
+      say("Tab share cancelled - share this tab so the site pages are in the video");
+      return false;
+    }
+    const track = stream.getVideoTracks()[0] as MediaStreamTrack & {
+      restrictTo?: (t: unknown) => Promise<void>;
+      cropTo?: (t: unknown) => Promise<void>;
+    };
+    try {
+      track.contentHint = "motion"; // smooth scrolls; the edit keeps the text sharp at 1080p
+      if (w.RestrictionTarget && track.restrictTo) await track.restrictTo(await w.RestrictionTarget.fromElement(layer));
+      else if (w.CropTarget && track.cropTo) await track.cropTo(await w.CropTarget.fromElement(layer));
+      else throw new Error("no region capture");
+    } catch {
+      stream.getTracks().forEach((t) => t.stop());
+      say("Pick THIS tab (the booth) when sharing, so the site pages can be recorded");
+      return false;
+    }
+    track.addEventListener("ended", () => {
+      if (siteRec.current?.stream === stream && recRef.current?.state === "recording") {
+        say("Tab sharing stopped - site pages from here on are not in the video");
+      }
+    });
+    siteRec.current = { stream, rec: null, chunks: [], mime: "", start: 0, boxes: [] };
+    return true;
+  }, [say]);
+
+  // Where the on-air pages sit, logged through the take so the edit can find them on the track.
+  const logSiteBoxes = useRef<() => void>(() => {});
+  const startSiteRecorder = useCallback(() => {
+    const sr = siteRec.current;
+    if (!sr || sr.rec || recRef.current?.state !== "recording") return;
+    const mime = ["video/webm;codecs=vp8", "video/webm;codecs=vp9", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
+    const rec = new MediaRecorder(sr.stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    sr.rec = rec;
+    sr.mime = mime;
+    sr.start = Math.max(0, (performance.now() - t0.current) / 1000);
+    rec.ondataavailable = (e) => {
+      if (e.data.size) sr.chunks.push(e.data);
+    };
+    rec.onstart = () => {
+      sr.start = Math.max(0, (performance.now() - t0.current) / 1000);
+    };
+    rec.start(1000);
+    logSiteBoxes.current();
+  }, []);
+  /** Stop the site track; its file and where the pages sat, or null when there is none. */
+  const finishSiteTrack = useCallback(async () => {
+    const sr = siteRec.current;
+    siteRec.current = null;
+    if (!sr) return null;
+    const rec = sr.rec;
+    if (rec && rec.state !== "inactive") {
+      await new Promise<void>((res) => {
+        rec.addEventListener("stop", () => res(), { once: true });
+        rec.stop();
+      });
+    }
+    sr.stream.getTracks().forEach((t) => t.stop());
+    if (!rec || !sr.chunks.length) return null;
+    return { blob: new Blob(sr.chunks, { type: sr.mime || "video/webm" }), start: +sr.start.toFixed(3), boxes: sr.boxes };
+  }, []);
+
+  /** Put a view on the stage. During a take the first page on air starts the site track. */
+  const applySite = useCallback(
+    async (view: SiteView, air: SiteTab | null, pair: SiteTab | null) => {
+      if (view !== "off" && !air) return;
+      if (view !== "off" && recRef.current?.state === "recording" && !STATIC && !siteRec.current) {
+        if (!(await startSiteCapture())) return;
+        startSiteRecorder();
+      }
+      const before = siteArg(siteView, tabById(airId), tabById(pairId));
+      const next = siteArg(view, air, pair);
+      setSiteView(view);
+      if (air) setAirId(air.id);
+      setPairId(view === "pair" && pair ? pair.id : 0);
+      if (next !== before) {
+        say(view === "off" ? "Graphic only" : `${SITE_LABEL[view]} · ${view === "pair" ? `${pair?.path} | ${air?.path}` : air?.path}`);
+        pushCue({ cmd: "site", arg: next });
+      }
+    },
+    [airId, pairId, pushCue, say, siteView, startSiteCapture, startSiteRecorder, tabById],
+  );
+  /** G W E Q and the view buttons: the same view again goes back to the graphic. */
+  const chooseSite = useCallback(
+    (want: SiteView) => {
+      const view = want === siteView && want !== "off" ? "off" : want;
+      if (view === "off") return void applySite("off", tabById(airId), null);
+      const air = tabById(airId) ?? siteTabs[0] ?? makeTab("/");
+      if (!air) return;
+      let pair: SiteTab | null = null;
+      if (view === "pair") {
+        const prev = tabById(prevAir.current);
+        pair =
+          (tabById(pairId)?.id !== air.id ? tabById(pairId) : null) ??
+          (prev && prev.id !== air.id ? prev : null) ??
+          siteTabs.find((t) => t.id !== air.id) ??
+          makeTab(air.path);
+        if (!pair) return;
+      }
+      void applySite(view, air, pair);
+    },
+    [airId, applySite, makeTab, pairId, siteTabs, siteView, tabById],
+  );
+  /** A tab onto the stage (or, with the graphic up, the tab the address bar works on). */
+  const setAirTab = useCallback(
+    (t: SiteTab) => {
+      if (t.id === airId) return;
+      prevAir.current = airId;
+      // Two pages: picking the other one on stage swaps the sides.
+      const pair = siteView === "pair" ? (t.id === pairId ? tabById(airId) : tabById(pairId)) : null;
+      void applySite(siteView, t, pair);
+    },
+    [airId, applySite, pairId, siteView, tabById],
+  );
+  const stepAirTab = useCallback(
+    (dir: number) => {
+      if (siteTabs.length < 2) return;
+      const i = Math.max(0, siteTabs.findIndex((t) => t.id === airId));
+      setAirTab(siteTabs[(i + dir + siteTabs.length) % siteTabs.length]);
+    },
+    [airId, setAirTab, siteTabs],
+  );
+  const newSiteTab = useCallback(() => {
+    const t = makeTab(tabById(airId)?.path ?? "/");
+    if (!t) return;
+    prevAir.current = airId;
+    void applySite(siteView === "pair" ? "pair" : siteView, t, siteView === "pair" ? tabById(airId) : null);
+    say(`Site tab ${siteTabs.length + 1} · type a page or pick one below`);
+  }, [airId, applySite, makeTab, say, siteTabs.length, siteView, tabById]);
+  const closeSiteTab = useCallback(
+    (id: number) => {
+      const i = siteTabs.findIndex((t) => t.id === id);
+      if (i < 0) return;
+      const rest = siteTabs.filter((t) => t.id !== id);
+      setSiteTabs(rest);
+      setAirMounted((m) => m.filter((x) => x !== id));
+      setRefMounted((m) => m.filter((x) => x !== id));
+      if (prevAir.current === id) prevAir.current = 0;
+      if (refId === id) setRefId(rest[Math.min(i, rest.length - 1)]?.id ?? 0);
+      const air = id === airId ? rest[Math.min(i, rest.length - 1)] ?? null : tabById(airId);
+      let view = siteView;
+      let pair = siteView === "pair" ? tabById(pairId) : null;
+      if (view === "pair" && (!pair || pair.id === id)) pair = rest.find((t) => t.id !== air?.id) ?? null;
+      if (view === "pair" && !pair) view = "full";
+      if (!air) view = "off";
+      if (air && id === airId) setAirId(air.id);
+      if (!air) setAirId(0);
+      if (view !== siteView || id === airId || id === pairId) void applySite(view, air, pair);
+    },
+    [airId, applySite, pairId, refId, siteTabs, siteView, tabById],
+  );
+  /** Send a tab to a page; it reloads wherever it shows. */
+  const goSite = useCallback(
+    (input: string, which: "air" | "ref" = "air") => {
+      const path = sitePath(input);
+      const tab = tabById(which === "air" ? airId : refId);
+      if (!path) {
+        if (which === "air") setSiteAddr(tab?.path ?? "");
+        return say("Only chase-analytics.com pages open here");
+      }
+      if (!tab) {
+        const t = makeTab(path);
+        if (!t) return;
+        if (which === "ref") setRefId(t.id);
+        else setAirId(t.id);
+        return;
+      }
+      const moved = { ...tab, path, rev: tab.rev + 1 };
+      setSiteTabs((ts) => ts.map((t) => (t.id === tab.id ? moved : t)));
+      // On the stage during a take: the cue sheet follows the page.
+      const onAir = siteView !== "off" && (tab.id === airId || (siteView === "pair" && tab.id === pairId));
+      if (onAir) {
+        const air = tab.id === airId ? moved : tabById(airId);
+        const pair = siteView === "pair" ? (tab.id === pairId ? moved : tabById(pairId)) : null;
+        pushCue({ cmd: "site", arg: siteArg(siteView, air, pair) });
+      }
+      say(`${which === "ref" ? "Off air" : "Site"} · ${path}`);
+    },
+    [airId, makeTab, pairId, pushCue, refId, say, siteView, tabById],
+  );
+  const toggleRef = useCallback(
+    (open?: boolean) => {
+      const next = open ?? !refOpen;
+      setRefOpen(next);
+      writePref("booth.ref", next ? "1" : "0");
+      if (next && !siteTabs.length) {
+        const t = makeTab("/");
+        if (t) setRefId(t.id);
+      }
+      say(next ? "Off-air reference open - only you see it" : "Off-air reference closed");
+    },
+    [makeTab, refOpen, say, siteTabs.length],
+  );
+
+  // Keep the chosen tabs valid, give tabs their iframes when first shown, remember the tabs.
+  useEffect(() => {
+    if (siteTabs.length && !tabById(airId)) setAirId(siteTabs[0].id);
+    if (siteTabs.length && !tabById(refId)) setRefId(siteTabs[0].id);
+  }, [airId, refId, siteTabs, tabById]);
+  useEffect(() => {
+    const ids = siteView === "off" ? [] : siteView === "pair" ? [airId, pairId] : [airId];
+    setAirMounted((m) => (ids.every((i) => !i || m.includes(i)) ? m : [...m, ...ids.filter((i) => i && !m.includes(i))]));
+  }, [airId, pairId, siteView]);
+  useEffect(() => {
+    if (refOpen && refId) setRefMounted((m) => (m.includes(refId) ? m : [...m, refId]));
+  }, [refOpen, refId]);
+  useEffect(() => {
+    const idx = (id: number) => Math.max(0, siteTabs.findIndex((t) => t.id === id));
+    writePref("booth.siteTabs", JSON.stringify({ tabs: siteTabs.map((t) => t.path), air: idx(airId), ref: idx(refId) }));
+  }, [airId, refId, siteTabs]);
+  useEffect(() => {
+    const t = tabById(airId);
+    if (t) setSiteAddr(t.path);
+  }, [airId, tabById]);
+
   const requestMedia = useCallback(() => {
     setCamError("");
     setMediaRequested(true);
@@ -743,6 +1103,11 @@ const App: React.FC = () => {
       setStrokes((s) => s.filter((x) => String(x.id) !== last.arg));
     } else if (last.cmd === "focus") {
       setFocusMap((m) => ({ ...m, [currentKey]: (m[currentKey] ?? []).slice(0, -1) }));
+    } else if (last.cmd === "site") {
+      // Back to the view before it (the pages stay where they are now).
+      const prev = [...cuesRef.current].reverse().find((c) => c.cmd === "site");
+      const view = (String(prev?.arg ?? "off").split(/\s+/)[0] as SiteView) || "off";
+      setSiteView(SITE_VIEWS.includes(view) ? view : "off");
     }
     say(`Undone · ${cueLabel(last, byKey)}`);
   }, [byKey, currentKey, say]);
@@ -772,12 +1137,16 @@ const App: React.FC = () => {
       if (mode !== "bubble") cuesRef.current.push({ t: 0, cmd: "layout", arg: mode });
       if (size !== "full") cuesRef.current.push({ t: 0, cmd: "size", arg: size });
       for (const o of overlaysOn) cuesRef.current.push({ t: 0, cmd: "overlay", arg: `${o} on` });
+      if (siteView !== "off") cuesRef.current.push({ t: 0, cmd: "site", arg: siteArgNow.current() });
       setCues([...cuesRef.current]);
       setPhase("recording");
       setStrokes([]);
+      startSiteRecorder();
     };
     rec.onstop = async () => {
       playerRef.current?.play();
+      const site = await finishSiteTrack();
+      const dims = frameDims.current;
       recStream.getTracks().forEach((t) => t.stop());
       programCapture.current?.getTracks().forEach((t) => t.stop());
       programCapture.current = null;
@@ -796,9 +1165,17 @@ const App: React.FC = () => {
         }
         let r = await fetch(`/api/save?name=${name}&ext=webm`, { method: "POST", body: blob });
         if (!r.ok) throw new Error(await r.text());
+        if (site) {
+          r = await fetch(`/api/save?name=${name}.site&ext=webm`, { method: "POST", body: site.blob });
+          if (!r.ok) throw new Error(`site track: ${await r.text()}`);
+        }
         r = await fetch(`/api/cues?name=${name}`, {
           method: "POST",
-          body: JSON.stringify({ cues: cuesRef.current, strokes: strokeStore.current }),
+          body: JSON.stringify({
+            cues: cuesRef.current,
+            strokes: strokeStore.current,
+            ...(site ? { site: { start: site.start, width: dims.W, height: dims.H, format: dims.format, boxes: site.boxes } } : {}),
+          }),
         });
         if (!r.ok) throw new Error(await r.text());
         setSaved(name);
@@ -811,7 +1188,7 @@ const App: React.FC = () => {
     };
     recRef.current = rec;
     rec.start(1000);
-  }, [currentKey, mode, overlaysOn, size, stream]);
+  }, [currentKey, finishSiteTrack, mode, overlaysOn, siteView, size, startSiteRecorder, stream]);
 
   const toggleRecord = useCallback(async () => {
     if (phase === "recording") {
@@ -822,6 +1199,7 @@ const App: React.FC = () => {
       programCapture.current?.getTracks().forEach((t) => t.stop());
       programCapture.current = null;
       setProgramLive(false);
+      void finishSiteTrack();
       setPhase("idle");
       say("Countdown cancelled");
       return;
@@ -849,9 +1227,11 @@ const App: React.FC = () => {
       beginRecording();
       return;
     }
+    // Site pages are recorded as their own track: share this tab now, before the 3-2-1.
+    if (siteTabs.length && !(await startSiteCapture())) return;
     setCount(3);
     setPhase("countdown");
-  }, [beginRecording, micId, phase, phoneTrack, say, stream]);
+  }, [beginRecording, finishSiteTrack, micId, phase, phoneTrack, say, siteTabs.length, startSiteCapture, stream]);
 
   useEffect(() => {
     if (phase !== "countdown") return;
@@ -890,6 +1270,28 @@ const App: React.FC = () => {
     setFrameEl(node);
   };
   const drawActive = pen;
+
+  /* where the on-air site pages sit (frame px), and the site-track bookkeeping that follows them */
+  const siteGeom = cat ? frameGeom(format, format === "wide" ? "youtube" : platform, mode, CAM[format], size) : null;
+  const siteBoxes = siteGeom ? siteSplit(siteGeom, siteView, format).sites : [];
+  const siteBoxKey = JSON.stringify(siteBoxes);
+  const frameDims = useRef({ W, H, format });
+  frameDims.current = { W, H, format };
+  const siteArgNow = useRef<() => string>(() => "off");
+  siteArgNow.current = () => siteArg(siteView, tabById(airId), tabById(pairId));
+  logSiteBoxes.current = () => {
+    const sr = siteRec.current;
+    if (!sr?.rec || recRef.current?.state !== "recording" || siteView === "off" || !siteBoxes.length) return;
+    const last = sr.boxes[sr.boxes.length - 1];
+    if (last && last.view === siteView && sameBoxes(last.boxes, siteBoxes)) return;
+    const round = (b: Box) => ({ x: +b.x.toFixed(1), y: +b.y.toFixed(1), w: +b.w.toFixed(1), h: +b.h.toFixed(1) });
+    sr.boxes.push({ t: +now().toFixed(3), view: siteView, boxes: siteBoxes.map(round) });
+  };
+  useEffect(() => logSiteBoxes.current(), [siteBoxKey, siteView, phase]);
+  const siteWidthFor = (v: SiteView) => {
+    const view = v === "off" ? "full" : v;
+    return siteWidths[`${format}.${view}`] ?? SITE_WIDTH[format][view];
+  };
   const press = useRef<{ x: number; y: number; id: number } | null>(null);
   const toFrame = (e: React.PointerEvent) => {
     const r = svgRef.current!.getBoundingClientRect();
@@ -999,6 +1401,12 @@ const App: React.FC = () => {
       } else if (k === "arrowup" || (k === " " && e.shiftKey)) {
         stop();
         showGroup(groupIdx - 1);
+      } else if (SITE_KEYS[k]) {
+        chooseSite(SITE_KEYS[k]);
+      } else if (k === "," || k === ".") {
+        stepAirTab(k === "." ? 1 : -1);
+      } else if (k === "o") {
+        toggleRef();
       } else if (OVERLAY_KEYS[k]) {
         toggleOverlay(OVERLAY_KEYS[k]);
       } else if (k === "[" || k === "]") {
@@ -1029,7 +1437,7 @@ const App: React.FC = () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKey);
     };
-  }, [changeMode, changeSize, clearDrawings, groupIdx, help, mark, overlaysOn, palette.open, say, setFocus, showGroup, size, stepVariant, toggleOverlay, toggleRecord, undo]);
+  }, [changeMode, changeSize, chooseSite, clearDrawings, groupIdx, help, mark, overlaysOn, palette.open, say, setFocus, showGroup, size, stepAirTab, stepVariant, toggleOverlay, toggleRecord, toggleRef, undo]);
 
   const results = useMemo(() => {
     const q = palette.q.trim().toLowerCase();
@@ -1082,7 +1490,13 @@ const App: React.FC = () => {
     captionHint: "",
     size,
     overlays: overlaysOn.map((o) => ({ name: OVERLAYS[o], props: overlayProps(o) })),
+    site: siteView,
   };
+  const airTab = tabById(airId);
+  const refTab = tabById(refId);
+  // A page that is not on the stage keeps its iframe (and its place) out of sight at the full-page spot.
+  const siteRest: Box = (siteGeom && siteSplit(siteGeom, "full", format).sites[0]) || { x: 0, y: 0, w: W, h: H };
+  const siteSlot = (id: number) => (siteView === "pair" ? (id === pairId ? 0 : id === airId ? 1 : -1) : siteView !== "off" && id === airId ? 0 : -1);
   const cams = devices.filter((d) => d.kind === "videoinput");
   const mics = devices.filter((d) => d.kind === "audioinput");
   const nextGroup = groups[(groupIdx + 1) % groups.length];
@@ -1121,16 +1535,31 @@ const App: React.FC = () => {
 
   return (
     <div className="booth">
-      <main className="stage" style={{ ["--program-ar" as string]: String(W / H) }}>
+      <main className={refOpen ? "stage with-ref" : "stage"} style={{ ["--program-ar" as string]: String(W / H) }}>
         <div className="program-rail" aria-hidden="true">
           <span className={recording ? "program-tag live" : "program-tag"}>{recording ? "● ON AIR" : "PROGRAM"}</span>
           <b>{format === "vertical" ? "VERTICAL 9:16" : "WIDE 16:9"}</b>
           <span>{LAYOUT_LABEL[mode]}</span>
-          <span className="program-now">{currentVertical?.groupLabel} · {currentVertical?.label}</span>
+          {siteView !== "off" ? <span className="program-site">{SITE_LABEL[siteView]}</span> : null}
+          <span className="program-now">
+            {siteView === "full" || siteView === "pair"
+              ? `chase-analytics.com${siteView === "pair" ? ` ${tabById(pairId)?.path} | ${airTab?.path}` : airTab?.path}`
+              : `${currentVertical?.groupLabel} · ${currentVertical?.label}`}
+          </span>
         </div>
         {!focused ? (
-          <div className="focus-banner" onClick={() => window.focus()}>
-            Click here so the booth can hear your keys
+          <div
+            className="focus-banner"
+            onClick={() => {
+              // A click into a site page leaves the keys with that page: take them back.
+              if (document.activeElement instanceof HTMLIFrameElement) document.activeElement.blur();
+              window.focus();
+              setFocused(true);
+            }}
+          >
+            {document.activeElement instanceof HTMLIFrameElement
+              ? "Your keys are going to the site page - click here to give them back to the booth"
+              : "Click here so the booth can hear your keys"}
           </div>
         ) : null}
         <div className="program-fit">
@@ -1138,7 +1567,43 @@ const App: React.FC = () => {
           <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: "0 0", position: "relative" }}>
             {/* 1. page ground  2. live camera  3. the frame (transparent)  4. ink */}
             <div style={{ position: "absolute", inset: 0, background: "var(--surface-page)" }} />
-            <div ref={playerBoxRef} style={{ position: "absolute", inset: 0, width: W, height: H, zIndex: 1 }}>
+            {/* chase-analytics.com on the stage: under the graphics' frame (header, overlays) and
+                recorded on its own as the site track. */}
+            {siteTabs.length ? (
+              <div ref={siteLayerRef} className="site-layer" style={{ width: W, height: H }}>
+                <i className="site-tick" />
+                {siteTabs
+                  .filter((t) => airMounted.includes(t.id))
+                  .map((t) => {
+                    const slot = siteSlot(t.id);
+                    const box = slot >= 0 ? siteBoxes[slot] : undefined;
+                    const b = box ?? siteRest;
+                    const pw = siteWidthFor(siteView);
+                    const k = b.w / pw;
+                    return (
+                      <div
+                        key={t.id}
+                        className="site-card"
+                        style={{ left: b.x, top: b.y, width: b.w, height: b.h, visibility: box ? "visible" : "hidden" }}
+                      >
+                        {/* The live site, not timeline media: the booth records it as its own track. */}
+                        {/* eslint-disable-next-line @remotion/warn-native-media-tag */}
+                        <iframe
+                          key={t.rev}
+                          src={siteUrl(t.path)}
+                          title={`chase-analytics.com ${t.path}`}
+                          style={{ width: pw, height: b.h / k, transform: `scale(${k})` }}
+                        />
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : null}
+            <div
+              ref={playerBoxRef}
+              className="player-box"
+              style={{ position: "absolute", inset: 0, width: W, height: H, zIndex: 1, pointerEvents: siteView !== "off" ? "none" : undefined }}
+            >
             <Player
               key={format}
               ref={playerRef}
@@ -1228,6 +1693,60 @@ const App: React.FC = () => {
           {phase === "countdown" ? <div className="countdown">{count || ""}</div> : null}
         </div>
         </div>
+        {refOpen ? (
+          <aside className="ref-dock" aria-label="Off-air reference">
+            <div className="ref-head">
+              <span className="ref-tag">Off air · only you</span>
+              <select value={refId} onChange={(e) => setRefId(Number(e.target.value))} aria-label="Reference tab">
+                {siteTabs.map((t, i) => (
+                  <option key={t.id} value={t.id}>
+                    {i + 1} · {t.path}
+                  </option>
+                ))}
+              </select>
+              <button
+                title="Put this page on the stage"
+                onClick={() => {
+                  if (!refTab) return;
+                  if (siteView === "off") void applySite("full", refTab, null);
+                  else setAirTab(refTab);
+                }}
+              >
+                On air
+              </button>
+              <button className="ref-x" title="Close (O)" onClick={() => toggleRef(false)}>
+                ×
+              </button>
+            </div>
+            <form
+              className="site-addr"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const input = e.currentTarget.elements.namedItem("ref") as HTMLInputElement;
+                goSite(input.value, "ref");
+                input.blur();
+              }}
+            >
+              <input key={`${refTab?.id}-${refTab?.rev}`} name="ref" defaultValue={refTab?.path ?? "/"} spellCheck={false} aria-label="Reference page" />
+              <button type="submit">Go</button>
+            </form>
+            <div className="ref-body">
+              {siteTabs
+                .filter((t) => refMounted.includes(t.id))
+                .map((t) => (
+                  // The live site in the booth's own panel, never rendered into a video.
+                  // eslint-disable-next-line @remotion/warn-native-media-tag
+                  <iframe
+                    key={`${t.id}-${t.rev}`}
+                    src={siteUrl(t.path)}
+                    title={`Off-air chase-analytics.com ${t.path}`}
+                    style={{ visibility: t.id === refId ? "visible" : "hidden" }}
+                  />
+                ))}
+            </div>
+            <div className="hint">Never recorded. Pages here and on the stage are the same tabs, so you can line them up.</div>
+          </aside>
+        ) : null}
       </main>
 
       <aside className="panel">
@@ -1391,6 +1910,82 @@ const App: React.FC = () => {
                 {OVERLAY_LABEL[o]} <kbd>{"BNK"[i]}</kbd>
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="site">
+          <div className="eyebrow">chase-analytics.com on the stage · G W E Q</div>
+          <div className="seg site-views">
+            {SITE_VIEWS.map((v) => (
+              <button key={v} className={v === siteView ? "on" : ""} onClick={() => chooseSite(v)}>
+                {SITE_LABEL[v]} <kbd>{Object.keys(SITE_KEYS).find((k) => SITE_KEYS[k] === v)?.toUpperCase()}</kbd>
+              </button>
+            ))}
+          </div>
+          <div className="site-tabs">
+            {siteTabs.map((t, i) => {
+              const slot = siteSlot(t.id);
+              return (
+                <div key={t.id} className={`site-tab${t.id === airId ? " on" : ""}${slot >= 0 ? " live" : ""}`}>
+                  <button className="site-tab-go" title={siteUrl(t.path)} onClick={() => setAirTab(t)}>
+                    <b>{i + 1}</b>
+                    <span>{t.path}</span>
+                  </button>
+                  <button className="site-tab-x" title="Close tab" aria-label={`Close site tab ${i + 1}`} onClick={() => closeSiteTab(t.id)}>
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            <button className="site-tab-add" title="New tab on this page" disabled={siteTabs.length >= MAX_SITE_TABS} onClick={newSiteTab}>
+              +
+            </button>
+          </div>
+          <form
+            className="site-addr"
+            onSubmit={(e) => {
+              e.preventDefault();
+              goSite(siteAddr);
+              (e.currentTarget.elements.namedItem("addr") as HTMLInputElement).blur();
+            }}
+          >
+            <input name="addr" value={siteAddr} onChange={(e) => setSiteAddr(e.target.value)} placeholder="/nfl/  or a chase-analytics.com link" spellCheck={false} aria-label="Site page" />
+            <button type="submit">Go</button>
+          </form>
+          <div className="site-links">
+            {SITE_LINKS.map(([label, path]) => (
+              <button key={path} onClick={() => goSite(path)}>
+                {label}
+              </button>
+            ))}
+            {siteView === "pair" ? (
+              <button title="Swap the two pages" onClick={() => void applySite("pair", tabById(pairId), airTab)}>
+                ⇄ Swap
+              </button>
+            ) : null}
+          </div>
+          <label className="site-width">
+            Page width · {siteWidthFor(siteView)}px
+            <input
+              type="range"
+              min={360}
+              max={1920}
+              step={10}
+              value={siteWidthFor(siteView)}
+              onChange={(e) => {
+                const key = `${format}.${siteView === "off" ? "full" : siteView}`;
+                const next = { ...siteWidths, [key]: Number(e.target.value) };
+                setSiteWidths(next);
+                writePref("booth.siteWidths", JSON.stringify(next));
+              }}
+            />
+          </label>
+          <button className={refOpen ? "ref-toggle on" : "ref-toggle"} onClick={() => toggleRef()}>
+            {refOpen ? "Hide" : "Show"} off-air reference (only you) <kbd>O</kbd>
+          </button>
+          <div className="hint">
+            Site pages on the stage are in the video{STATIC ? "" : " (the first time, Record asks to share this tab: pick it)"}. The
+            reference panel never is. P turns drawing off so you can click and scroll a page; , . flip tabs.
           </div>
         </section>
 
@@ -1736,6 +2331,9 @@ const App: React.FC = () => {
                   ["Esc", "Clear a player spotlight"],
                   ["Drag on the picture", "Draw · T colour · X arrow tip · C clear · P turns drawing on/off"],
                   ["B N K", "Small graphics over the top: matchup bug · name strap · line ticker"],
+                  ["G W E Q", "Stage: graphic · site page · graphic + site · two site pages"],
+                  [", .", "Previous / next site tab on the stage"],
+                  ["O", "Off-air reference: chase-analytics.com only you see"],
                   ["[ ]", "Graphic size: smaller · bigger"],
                   ["M", "Mark a moment (listed in the plan, not shown)"],
                   ["U or Ctrl+Z", "Undo the last action"],

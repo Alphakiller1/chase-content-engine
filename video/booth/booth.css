@@ -27,7 +27,6 @@ body,
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  container-type: size;
   background:
     radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%),
     linear-gradient(var(--border-card) 1px, transparent 1px),
@@ -81,6 +80,85 @@ body,
   min-height: 0;
   display: grid;
   place-items: center;
+  /* The frame sizes itself to this box (cqi / cqb), so the off-air dock can take a column. */
+  container-type: size;
+}
+/* The off-air reference: a column beside the program, outside the recorded frame. */
+.stage.with-ref {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 38%);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 18px;
+  align-items: stretch;
+}
+.ref-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-inset);
+}
+.ref-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ref-tag {
+  flex: none;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.ref-head select {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.ref-head button {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-card);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.ref-head button:hover {
+  border-color: var(--accent);
+}
+.ref-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface-page);
+}
+.ref-body iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.ref-dock .hint {
+  margin: 0;
+  font-size: 12px;
+}
+.program-site {
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--accent);
+  color: var(--text-accent);
 }
 .frame {
   --ar: var(--program-ar, 1.777);
@@ -372,6 +450,55 @@ kbd {
   object-fit: cover;
   display: block;
   background: var(--surface-card);
+}
+/* chase-analytics.com on the stage (frame px, inside the scaled program). It is the
+   only thing in the site track, so it stays a stacking context of its own. */
+.site-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  isolation: isolate;
+  pointer-events: none;
+}
+.site-card {
+  position: absolute;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--surface-card);
+  box-shadow: 0 0 0 1px var(--border-card), 0 18px 50px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+}
+.site-card iframe {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 0;
+  transform-origin: 0 0;
+  background: var(--surface-page);
+}
+/* One pixel that never stops changing, so the site track gets a frame at once and
+   stays in step with the camera even while the page sits still. It is outside every
+   page box, so the edit never shows it. */
+.site-tick {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 2px;
+  animation: site-tick 66ms steps(1) infinite;
+}
+@keyframes site-tick {
+  0% {
+    background: #050506;
+  }
+  50% {
+    background: #060607;
+  }
+}
+/* With a page on the stage the graphics' frame lets clicks through to it, except the
+   faces a click can spotlight. */
+.player-box [data-player] {
+  pointer-events: auto;
 }
 .ink {
   position: absolute;
@@ -815,4 +942,138 @@ label.check {
   .stage {
     padding: 16px;
   }
+}
+
+/* ── the Site section ── */
+.site-views {
+  flex-wrap: wrap;
+}
+.site-views button {
+  flex: 1 1 40%;
+}
+.site-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.site-tab {
+  display: flex;
+  flex: 1 1 140px;
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--surface-page);
+  overflow: hidden;
+}
+.site-tab.on {
+  border-color: var(--accent);
+}
+/* On the stage right now (recorded). */
+.site-tab.live {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-page));
+}
+.site-tab button {
+  border: 0;
+  background: none;
+  color: inherit;
+}
+.site-tab-go {
+  display: flex;
+  flex: 1;
+  gap: 7px;
+  min-width: 0;
+  padding: 7px 9px;
+  text-align: left;
+  font-size: 13px;
+}
+.site-tab-go b {
+  flex: none;
+  color: var(--text-accent);
+}
+.site-tab-go span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.site-tab-x {
+  flex: none;
+  padding: 0 9px;
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+.site-tab-x:hover {
+  color: var(--text-primary);
+}
+.site-tab-add {
+  flex: none;
+  width: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+.site-tab-add:disabled {
+  opacity: 0.4;
+}
+.site-addr {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.site-addr input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.site-addr input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.site-addr button,
+.site-links button,
+.ref-toggle {
+  padding: 7px 11px;
+  border-radius: 8px;
+  border: 1px solid var(--border-card);
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.site-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.site-links button:hover,
+.site-addr button:hover,
+.ref-toggle:hover {
+  border-color: var(--accent);
+}
+.site-width {
+  margin: 12px 0 0;
+}
+.site-width input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  accent-color: var(--accent);
+}
+.ref-toggle {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13px;
+}
+.ref-toggle.on {
+  border-color: var(--accent);
+  color: var(--text-accent);
 }

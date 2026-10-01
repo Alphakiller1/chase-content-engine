@@ -23,6 +23,10 @@
  *               sheet so you can change the timing and run again.
  *   5. RENDER   out/edit/<name>-vertical.mp4 and/or <name>-wide.mp4.
  *
+ * Site pages: a booth take that put chase-analytics.com on the stage has a site track
+ * next to it (footage/<name>.site.webm + .site.json). The cue sheet's `site` lines say
+ * when a page was up; the edit cuts the track into the stage at those moments.
+ *
  * Options
  *   --pack <dir>        game pack (default: newest props/pack/*)
  *   --format <f>        vertical | wide | both   (default both)
@@ -78,13 +82,14 @@ let source = positional[0];
 if (!source) {
   const dir = path.join(root, "footage");
   const vids = fs.existsSync(dir)
-    ? fs.readdirSync(dir).filter((f) => VIDEO_EXT.test(f)).map((f) => path.join(dir, f))
+    ? fs.readdirSync(dir).filter((f) => VIDEO_EXT.test(f) && !/\.site\.\w+$/i.test(f)).map((f) => path.join(dir, f))
     : [];
   if (!vids.length) die(`No recording given and nothing in ${dir}. Put your video there, or pass its path.`);
   source = vids.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
 }
 source = path.resolve(source);
 if (!fs.existsSync(source)) die(`Recording not found: ${source}`);
+if (/\.site\.\w+$/i.test(source)) die(`${path.basename(source)} is a take's site track, not the take. Edit ${path.basename(source).replace(/\.site(\.\w+)$/i, "$1")} instead.`);
 
 const packDir = opts.pack ? path.resolve(root, opts.pack) : newestPack(root);
 if (!packDir) die("No game pack. Build one first: python -m outputs.video_pack --league nfl --game AWAY@HOME");
@@ -144,6 +149,50 @@ const duration = Number(
 );
 const probe = run("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", camera]).stdout.trim();
 console.log(`  ${clock(duration)} long, video ${probe || "none"}`);
+
+// The booth's site track: the chase-analytics.com pages that were on the stage.
+const siteTrack = (() => {
+  const base = path.join(path.dirname(source), path.parse(source).name);
+  const webm = `${base}.site.webm`;
+  const metaFile = `${base}.site.json`;
+  if (!fs.existsSync(webm) || !fs.existsSync(metaFile)) return null;
+  let meta;
+  try {
+    meta = JSON.parse(fs.readFileSync(metaFile, "utf8"));
+  } catch (e) {
+    console.log(`  (site track skipped: ${path.basename(metaFile)} is unreadable - ${e.message})`);
+    return null;
+  }
+  const width = Number(meta.width);
+  const height = Number(meta.height);
+  if (!(width > 0 && height > 0) || !Array.isArray(meta.boxes)) {
+    console.log(`  (site track skipped: ${path.basename(metaFile)} has no frame size or page boxes)`);
+    return null;
+  }
+  const out = path.join(work, "site.mp4");
+  if (!fresh(out, webm)) {
+    console.log("  re-encoding the site track ...");
+    // A fixed output size: the capture can change size mid-take if the window is resized.
+    run("ffmpeg", [
+      "-hide_banner", "-loglevel", "error", "-y", "-i", webm,
+      "-vf", `scale=w=${width}:h=${height}`,
+      "-r", String(FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+      "-an", "-movflags", "+faststart", out,
+    ]);
+  }
+  const len = Number(
+    run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", out]).stdout.trim(),
+  );
+  if (!(len > 0)) {
+    console.log("  (site track skipped: it has no frames)");
+    return null;
+  }
+  const boxes = meta.boxes
+    .filter((b) => Number.isFinite(b?.t) && Array.isArray(b.boxes) && b.boxes.length)
+    .sort((a, b) => a.t - b.t);
+  console.log(`  site track: ${clock(len)} from ${clock(Number(meta.start) || 0)} into the take`);
+  return { src: rel(out).replace(/^public\//, ""), width, height, start: Number(meta.start) || 0, duration: len, boxes };
+})();
 
 /* ── 2. listen ────────────────────────────────────────────────────────────── */
 step(2, `Listen  (whisper ${model}, on this machine)`);
@@ -604,8 +653,66 @@ const planFromSheet = (fmt, cues) => {
     strokes.push({ ...st, from: +toBodySnap(c.t).toFixed(3), until: end === undefined ? null : +toBodySnap(end).toFixed(3) });
   }
   const marks = cues.filter((x) => x.cmd === "mark").map((x) => ({ at: toBodySnap(x.t), note: x.arg }));
-  return { segments: closed, layouts, strokes, marks, overlays, sizes };
+  return { segments: closed, layouts, strokes, marks, overlays, sizes, ...sitePlan(cues) };
 };
+
+/**
+ * Site lines -> when the stage gives way to chase-analytics.com (siteViews) and which
+ * stretch of the site track fills it (siteClips), both in body seconds. Only what the
+ * track actually covers is used; outside it the graphic stays up.
+ */
+const BOX_LAG = 0.35; // seconds: cue times are rounded to 0.1 and the booth logs the boxes after it draws them
+function sitePlan(cues) {
+  const lines = cues.filter((x) => x.cmd === "site").map((c) => ({ t: c.t, view: String(c.arg).split(/\s+/)[0], arg: c.arg }));
+  if (!lines.length) return { siteViews: [], siteClips: [] };
+  if (!siteTrack) {
+    console.log("  (the cue sheet has site lines but this take has no site track - the graphics stay up)");
+    return { siteViews: [], siteClips: [] };
+  }
+  const cs = siteTrack.start;
+  const ce = siteTrack.start + siteTrack.duration;
+  const boxesAt = (t) => (siteTrack.boxes.findLast((b) => b.t <= t + 1e-6) ?? siteTrack.boxes[0])?.boxes ?? null;
+  const events = [];
+  const siteClips = [];
+  lines.forEach((ln, i) => {
+    if (ln.view === "off") return;
+    const a = Math.max(ln.t, cs);
+    const b = Math.min(lines[i + 1]?.t ?? duration, ce, duration);
+    if (b - a < 1 / FPS) {
+      if (ln.t < cs || ln.t >= ce) console.log(`  (site ${ln.arg} at ${formatTime(ln.t)} is outside the site track - skipped)`);
+      return;
+    }
+    // Where the pages sat for this line: the booth logs it a moment after the cue (and
+    // again on a layout switch inside the line, which splits the line there).
+    const own = siteTrack.boxes.filter((x) => x.view === ln.view && x.t >= ln.t - BOX_LAG && x.t < b);
+    const pieces = [
+      { at: a, boxes: own[0]?.boxes ?? boxesAt(a) },
+      ...own.slice(1).filter((x) => x.t > a + 1 / FPS && x.t < b - 1 / FPS).map((x) => ({ at: x.t, boxes: x.boxes })),
+    ];
+    let shown = false;
+    for (let m = 0; m < pieces.length; m++) {
+      const { boxes } = pieces[m];
+      if (!boxes) continue;
+      for (const c of cuts) {
+        const x0 = Math.max(pieces[m].at, c.from);
+        const x1 = Math.min(pieces[m + 1]?.at ?? b, c.to);
+        if (x1 - x0 < 1 / FPS) continue;
+        const from = toBody(x0);
+        siteClips.push({ from: +from.toFixed(3), to: +(from + (x1 - x0)).toFixed(3), srcFrom: +(x0 - cs).toFixed(3), boxes });
+        shown = true;
+      }
+    }
+    if (!shown) return;
+    events.push({ at: +toBodySnap(a).toFixed(3), view: ln.view }, { at: +toBodySnap(b).toFixed(3), view: "off" });
+  });
+  const siteViews = [{ from: 0, view: "off" }];
+  for (const e of events.sort((x, y) => x.at - y.at)) {
+    if (siteViews.at(-1).from === e.at) siteViews.pop();
+    if (siteViews.at(-1)?.view !== e.view) siteViews.push({ from: e.at, view: e.view });
+  }
+  if (!siteViews.length || siteViews[0].from > 0) siteViews.unshift({ from: 0, view: "off" });
+  return { siteViews, siteClips };
+}
 
 const defaultLayout = opts.layout ?? "bubble";
 if (!LAYOUT_MODES_JS.includes(defaultLayout)) die(`--layout must be one of ${LAYOUT_MODES_JS.join(", ")}`);
@@ -630,7 +737,7 @@ const plan = (fmt) =>
   sheetCues
     ? planFromSheet(fmt, sheetCues)
     : { segments: planFromSpeech(fmt), layouts: [{ from: 0, mode: defaultLayout }], strokes: [], marks: [],
-        overlays: [], sizes: [{ from: 0, size: "full" }] };
+        overlays: [], sizes: [{ from: 0, size: "full" }], siteViews: [], siteClips: [] };
 if (!sheetCues) {
   // Save the choice as a cue sheet, so the timing can be changed by editing it.
   const auto = planFromSpeech("vertical").map((s) => ({ t: +fromBody(s.from).toFixed(2), key: s.id }));
@@ -654,7 +761,7 @@ const jobs = [];
 const planText = [`${name}  ·  ${g.away} at ${g.home}  ·  ${clock(duration)} recorded -> ${clock(body)} after cuts`, ""];
 for (const fmt of formats) {
   const wide = fmt === "wide";
-  const { segments, layouts, strokes, marks, overlays, sizes } = plan(fmt);
+  const { segments, layouts, strokes, marks, overlays, sizes, siteViews, siteClips } = plan(fmt);
   const camSize = Number(opts["cam-size"] ?? (wide ? 210 : 250));
   const intro = wide && item("open") ? { composition: "EpisodeOpen", props: item("open").props, seconds: 6 } : null;
   const outro = wide
@@ -696,6 +803,9 @@ for (const fmt of formats) {
     strokes,
     overlays,
     sizes,
+    site: siteClips.length ? { src: siteTrack.src, width: siteTrack.width, height: siteTrack.height } : null,
+    siteViews,
+    siteClips,
   };
   const propsFile = path.join(propsDir, `${fmt}.json`);
   fs.writeFileSync(propsFile, JSON.stringify(props, null, 1));
@@ -710,6 +820,7 @@ for (const fmt of formats) {
     ...marks.map((m) => ({ at: m.at, text: `  mark: ${m.note}` })),
     ...overlays.map((o) => ({ at: o.from, text: `  overlay ${o.name} (to ${clock(lead + o.to)})` })),
     ...sizes.slice(1).map((z) => ({ at: z.from, text: `  graphic size -> ${z.size}` })),
+    ...siteViews.slice(1).map((v) => ({ at: v.from, text: v.view === "off" ? "  site off - graphic only" : `  site ${v.view} (chase-analytics.com)` })),
   ].sort((x, y) => x.at - y.at);
   for (const e of events) planText.push(`  ${clock(lead + e.at).padStart(5)}  ${e.text}`);
   planText.push(`  ${clock(lead + body).padStart(5)}  ${wide ? "End screen" : "Sting"}`, "");

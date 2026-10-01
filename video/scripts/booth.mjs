@@ -13,7 +13,9 @@
  * Builds booth/app.tsx, serves it on http://localhost:8790 and opens it. A take is
  * saved to video/footage/take-<date>-<time>.webm with a cue sheet
  * (<name>.cues.txt) of when each graphic came up; "Make my video" runs the
- * auto-edit on it (scripts/edit.mjs), which follows that sheet.
+ * auto-edit on it (scripts/edit.mjs), which follows that sheet. A take that put
+ * chase-analytics.com pages on the stage also saves <name>.site.webm (the pages, as
+ * they looked) and <name>.site.json (where they sat), which the edit cuts in.
  */
 import { build } from "esbuild";
 import { spawn, spawnSync } from "node:child_process";
@@ -322,10 +324,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && p === "/api/cues") {
       const name = safeName(url.searchParams.get("name"));
       if (!name) return res.writeHead(400).end("bad name");
-      // { cues: [{t, key} | {t, cmd, arg}], strokes: [{id, tone, arrow, points}] }
+      // { cues: [{t, key} | {t, cmd, arg}], strokes: [{id, tone, arrow, points}], site?: {start, width, height, boxes} }
       const body = JSON.parse(await readBody(req));
       const cues = Array.isArray(body) ? body : body.cues;
       const strokes = Array.isArray(body) ? [] : body.strokes ?? [];
+      // Where the on-air site pages sat, for the auto-edit to cut the site track in.
+      if (!Array.isArray(body) && body.site && fs.existsSync(path.join(footage, `${name}.site.webm`))) {
+        fs.writeFileSync(path.join(footage, `${name}.site.json`), JSON.stringify(body.site));
+      }
       const pack = loadPack(packDir);
       const tidy = (c) =>
         c.cmd

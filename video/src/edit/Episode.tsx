@@ -14,7 +14,7 @@ import {
 import { BrandLockup, Caps, TeamLogo } from "../ds/kit";
 import { EASE, progress } from "../ds/motion";
 import { Insets, Platform, SafeOverride } from "../ds/safe";
-import { Box, FrameGeom, LayoutMode, StageSize, Stroke, bugShift, frameGeom, lerpCam } from "./frames";
+import { Box, FrameGeom, LayoutMode, SiteView, StageSize, Stroke, bugShift, frameGeom, lerpCam, siteSplit } from "./frames";
 import { Ticker } from "../studio/Ticker";
 import { CornerBug } from "../graphics/CornerBug";
 import { LowerThird } from "../graphics/LowerThird";
@@ -93,6 +93,16 @@ export type EditSize = { from: number; size: StageSize };
 /** A telestration stroke, shown from `from` until `until` (BODY seconds). */
 export type EditStroke = Stroke & { from: number; until: number | null };
 
+/** Site view switches (chase-analytics.com on the stage), in BODY seconds. */
+export type EditSiteView = { from: number; view: SiteView };
+
+/**
+ * A stretch of the take's site track to show, over [from, to) BODY seconds, starting
+ * `srcFrom` seconds into the track. `boxes` are where the page(s) sat in the recorded
+ * frame (source frame px), in the order of the view's site boxes.
+ */
+export type EditSiteClip = { from: number; to: number; srcFrom: number; boxes: Box[] };
+
 export type Bookend = { composition: string; props: Record<string, unknown>; seconds: number };
 
 export type EpisodeProps = {
@@ -126,6 +136,10 @@ export type EpisodeProps = {
   strokes: EditStroke[];
   overlays: EditOverlay[];
   sizes: EditSize[];
+  /** The take's site track (the booth's on-air site pages), the size of the frame it was recorded in. */
+  site?: { src: string; width: number; height: number } | null;
+  siteViews?: EditSiteView[];
+  siteClips?: EditSiteClip[];
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -266,6 +280,75 @@ export const Stage: React.FC<{
         })}
       </SafeOverride.Provider>
     </div>
+  );
+};
+
+/**
+ * chase-analytics.com, replayed from the take's site track: each recorded page box is
+ * fitted into its box on this frame, on a card, so a page recorded in one format still
+ * reads in the other.
+ */
+const SiteClip: React.FC<{
+  site: NonNullable<EpisodeProps["site"]>;
+  clip: EditSiteClip;
+  targets: Box[];
+  opacity: number;
+}> = ({ site, clip, targets, opacity }) => {
+  const { fps } = useVideoConfig();
+  const a = Math.round(clip.srcFrom * fps);
+  const b = a + Math.max(1, Math.round((clip.to - clip.from) * fps));
+  return (
+    <>
+      {targets.map((tb, i) => {
+        const sb = clip.boxes[i] ?? clip.boxes[0];
+        if (!sb || sb.w <= 0 || sb.h <= 0) return null;
+        const k = Math.min(tb.w / sb.w, tb.h / sb.h);
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: tb.x,
+              top: tb.y,
+              width: tb.w,
+              height: tb.h,
+              borderRadius: 18,
+              overflow: "hidden",
+              background: "var(--surface-card)",
+              boxShadow: "0 0 0 1px var(--border-card), 0 18px 50px rgba(0,0,0,.45)",
+              opacity,
+            }}
+          >
+            {/* Exactly the recorded page box, so nothing else on the track shows round it. */}
+            <div
+              style={{
+                position: "absolute",
+                left: (tb.w - sb.w * k) / 2,
+                top: (tb.h - sb.h * k) / 2,
+                width: sb.w * k,
+                height: sb.h * k,
+                overflow: "hidden",
+              }}
+            >
+              <OffthreadVideo
+                src={staticFile(site.src)}
+                trimBefore={a}
+                trimAfter={b}
+                muted
+                style={{
+                  position: "absolute",
+                  left: -sb.x * k,
+                  top: -sb.y * k,
+                  width: site.width * k,
+                  height: site.height * k,
+                  maxWidth: "none",
+                }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 };
 
@@ -534,9 +617,24 @@ const Body: React.FC<{ p: EpisodeProps; offset: number }> = ({ p, offset }) => {
   const stageFade = prev === mode ? 1 : Math.min(1, since / 0.3);
   const ring = teamAccent(p.home, p.league);
   const inBody = t >= 0 && t < bodyLen;
+  let view: SiteView = "off";
+  if (p.site) for (const v of p.siteViews ?? []) if (v.from <= t) view = v.view;
+  const split = siteSplit(G, view, p.format);
   return (
     <>
-      <Stage box={G.stage} insets={G.insets} segments={p.segments} offset={offset} opacity={stageFade} />
+      <Stage box={split.graphic ?? { ...G.stage, visible: false }} insets={G.insets} segments={p.segments} offset={offset} opacity={stageFade} />
+      {p.site
+        ? (p.siteClips ?? []).map((c, i) => {
+            const from = Math.round((offset + c.from) * fps);
+            const dur = Math.round((c.to - c.from) * fps);
+            if (dur <= 0 || !split.sites.length) return null;
+            return (
+              <Sequence key={`site-${i}`} name="Site" from={from} durationInFrames={dur}>
+                <SiteClip site={p.site!} clip={c} targets={split.sites} opacity={stageFade} />
+              </Sequence>
+            );
+          })
+        : null}
       {(p.overlays ?? []).map((o, i) => {
         const Comp = GRAPHICS[o.name];
         const from = Math.round((offset + o.from) * fps);
